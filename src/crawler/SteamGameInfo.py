@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from src.config.constant import RAW_GAME_ID_SUBFOLDER, GAME_INFO_URL, RAW_GAME_INFO_SUBFOLDER, RAW_INFO_METADATA_SUBFOLDER
 
 import requests
 from dotenv import load_dotenv
@@ -27,13 +28,13 @@ class CrawlerConfig:
     project_root: Path = Path(__file__).resolve().parents[2]
 
     # 輸入路徑設定 (讀取 game_id)
-    input_sub_folder: str = r"data/raw/game_id"
+    input_sub_folder: str = RAW_GAME_ID_SUBFOLDER
 
     # 輸出路徑設定 (儲存 game_info)
-    output_sub_folder: str = r"data/raw/game_info"
+    output_sub_folder: str = RAW_GAME_INFO_SUBFOLDER
 
     # Metadata 輸出路徑 (依據原程式邏輯，維持存放在 game_id/metadata)
-    metadata_sub_folder: str = r"data/raw/game_id/metadata"
+    metadata_sub_folder: str = RAW_INFO_METADATA_SUBFOLDER
 
     # 爬蟲參數
     max_items_per_file: int = 2000     # 每個輸出檔案存幾筆
@@ -76,7 +77,7 @@ class SteamGameInfoCrawler:
         self.metadata_folder.mkdir(parents=True, exist_ok=True)
 
     def _get_game_details_url(self, app_id: int) -> str:
-        return f"https://store.steampowered.com/api/appdetails?appids={app_id}"
+        return GAME_INFO_URL.format(app_id)
 
     def _fetch_single_game(self, app_id: int) -> Optional[Dict]:
         """執行單一遊戲的 API 請求，包含重試機制"""

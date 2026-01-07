@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from src.config.constant import GAME_ID_URL, RAW_GAME_ID_SUBFOLDER
+
 
 import requests
 from dotenv import load_dotenv
@@ -26,11 +28,11 @@ load_dotenv()
 class CrawlerConfig:
     """爬蟲設定檔"""
     api_key: str = os.environ.get("STEAM_API_KEY", "")
-    base_url: str = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
+    base_url: str = GAME_ID_URL
     project_root: Path = Path(__file__).resolve().parents[2]
 
     # 資料存儲路徑 (相對於 project_root)
-    raw_data_sub_folder: str = r"data/raw/game_id"
+    raw_data_sub_folder: str = RAW_GAME_ID_SUBFOLDER
     max_result_per_request: int = 4000  # 每次 API 請求的筆數
     max_items_per_file: int = 4000     # 每個檔案最大儲存筆數
     max_retries: int = 5               # 最大重試次數
