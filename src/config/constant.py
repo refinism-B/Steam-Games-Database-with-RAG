@@ -14,21 +14,24 @@ GAME_TAG_URL = "https://steamspy.com/api.php?request=appdetails&appid={}"
 
 # raw資料存放路徑
 RAW_GAME_ID_SUBFOLDER = r"data\raw\game_id"
-RAW_GAME_INFO_SUBFOLDER = r"data\raw\game_info"
-RAW_GAME_REVIEWS_SUBFOLDER = r"data\raw\game_review"
-RAW_GAME_TAG_SUBFOLDER = r"data\raw\game_tag"
 RAW_ID_METADATA_SUBFOLDER = r"data\raw\game_id\metadata"
-RAW_INFO_METADATA_SUBFOLDER = r"data\raw\game_info\metadata"
-RAW_REVIEW_METADATA_SUBFOLDER = r"data\raw\game_review\metadata"
-RAW_TAG_METADATA_SUBFOLDER = r"data\raw\game_tag\metadata"
 
 RAW_DATA_PATH = r"data\raw\{}"
 RAW_METADATA_PATH = r"data\raw\{}\metadata"
+
+PROCESSED_DATA_PATH = r"data\processed\{}"
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 # game info保留的欄位
-MAIN_COLS = ['steam_appid', 'name', 'type', 'required_age', 'is_free', 'detailed_description', 'recommendations',
-             'about_the_game', 'short_description', 'supported_languages', 'website', 'pc_requirements',
-             'mac_requirements', 'linux_requirements', 'developers', 'publishers', 'price_overview',
-             'platforms', 'metacritic', 'categories', 'genres', 'release_date', ]
+INFO_MAIN_COLS = ['steam_appid', 'name', 'type', 'required_age', 'is_free', 'detailed_description',
+                  'about_the_game', 'short_description', 'supported_languages', 'pc_requirements',
+                  'mac_requirements', 'linux_requirements', 'developers', 'publishers', 'price_overview',
+                  'platforms', 'metacritic', 'categories', 'genres', 'release_date', ]
+
+# game review保留的欄位
+REVIEW_MAIN_COLS = ['query_summary', 'appid']
+
+# game tag保留的欄位
+TAG_MAIN_COLS = ['appid', 'name', 'languages', 'tags']
