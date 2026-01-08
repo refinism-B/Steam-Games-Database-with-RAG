@@ -1,4 +1,5 @@
 import json
+import traceback
 from datetime import datetime
 from pathlib import Path
 
@@ -49,6 +50,27 @@ def clean_hardware_requirement(data):
                 req_data[req_key] = " ".join(req_data[req_key].split())
                 req_data[req_key] = req_data[req_key].replace(
                     "*", "").replace(" , ", ", ").strip()
+    return data
+
+
+def flatten_hardware_requirement(data):
+    hardware_list = ['pc_requirements',
+                     'mac_requirements', 'linux_requirements']
+    new_requirement_dict = {}
+
+    for hardware in hardware_list:
+        # 增加 isinstance(data[hardware], dict) 的檢查
+        if hardware not in data or not isinstance(data[hardware], dict):
+            # 如果不是字典（可能是 None 或 []），就設為 None 並跳過
+            data[hardware] = None
+            continue
+
+        for spec in list(data[hardware].keys()):
+            new_requirement_dict[f"{hardware}_{spec}"] = data[hardware][spec]
+
+        data.pop(hardware, None)
+
+    data.update(new_requirement_dict)
     return data
 
 
@@ -175,7 +197,12 @@ while True:
                         price['initial'] = float(price['initial']) / 100
                     except (ValueError, TypeError):
                         price['initial'] = 0.0
-                new_game_info["price_overview"] = price
+
+                price["price_initial"] = price.pop("initial", None)
+                price["price_currency"] = price.pop("currency", None)
+
+                new_game_info.update(price)
+                new_game_info.pop("price_overview", None)
             else:
                 new_game_info["price_overview"] = None
 
@@ -225,7 +252,8 @@ while True:
                     except ValueError:
                         # 遇到無法解析的日期格式 (如 "Oct 2020")，保留原始字串或設為 None
                         pass
-                new_game_info['release_date'] = new_release_date
+                new_game_info.pop("release_date", None)
+                new_game_info.update(new_release_date)
 
             # 處理query_summary（review）
             # 需先檢查是否拿到 query_summary，若無則給預設字典
@@ -246,7 +274,8 @@ while True:
             review_overview["positive_rate"] = positive_rate
             review_overview["rate_percentage"] = f"{positive_rate:.1%}"
 
-            new_game_info["review"] = review_overview
+            new_game_info.update(review_overview)
+            # new_game_info["review"] = review_overview
             new_game_info.pop("query_summary", None)
 
             """
@@ -260,6 +289,7 @@ while True:
 
             # 處理hardware_requirements
             new_game_info = clean_hardware_requirement(data=new_game_info)
+            new_game_info = flatten_hardware_requirement(data=new_game_info)
 
             # 加入列表
             data_list.append(new_game_info)
@@ -268,7 +298,7 @@ while True:
             # 捕捉單筆資料處理失敗，印出錯誤但不中斷整個迴圈
             print(
                 f"處理 AppID {key_list[0] if key_list else 'Unknown'} 時發生錯誤: {e}")
-            # traceback.print_exc() # 如果需要詳細錯誤訊息可以取消註解
+            traceback.print_exc()  # 如果需要詳細錯誤訊息可以取消註解
             continue
 
     """
@@ -282,7 +312,7 @@ while True:
         final_json_data["update_time"] = update_time
         final_json_data["data"] = data_list
 
-        json_folder = PROJECT_ROOT / PROCESSED_DATA_PATH.format("json")
+        json_folder = PROJECT_ROOT / PROCESSED_DATA_PATH.format("json_data")
         # 確保目標資料夾存在
         json_folder.mkdir(parents=True, exist_ok=True)
 

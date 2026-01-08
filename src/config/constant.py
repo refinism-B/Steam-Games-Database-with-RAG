@@ -35,3 +35,12 @@ REVIEW_MAIN_COLS = ['query_summary', 'appid']
 
 # game tag保留的欄位
 TAG_MAIN_COLS = ['appid', 'name', 'languages', 'tags']
+
+# Document所需欄位
+METADATA_COLS = ['type', 'name', 'steam_appid', 'required_age', 'is_free', 'supported_languages',
+                 'developers', 'publishers', 'price_initial', 'price_currency', 'platforms',
+                 'categories', 'genres', 'release_date', 'release_date_timestamp', 'release_date_year',
+                 'release_date_month', 'review_score_desc', 'total_positive', 'total_negative', 'total_reviews',
+                 'positive_rate', 'rate_percentage', 'languages', 'tags', 'metacritic_score']
+CONTEXT_COLS = ['name', 'detailed_description', 'about_the_game',
+                'short_description', 'developers', 'publishers', 'categories', 'genres', 'tags']
