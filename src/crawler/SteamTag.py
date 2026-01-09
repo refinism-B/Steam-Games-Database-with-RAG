@@ -9,9 +9,13 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-if __name__ == "__main__":
+
+def run_steam_tag():
+    logging.info("收到指令，開始執行 Steam tag 爬蟲...")
+    # if __name__ == "__main__":
     tag_scraper = SteamScraperBase(
         scraper_type="game_tag", url_type=GAME_TAG_URL, max_input_files=1)
     # tag_scraper.id_file_num = 2
     # tag_scraper.output_file_num = 3
     tag_scraper.run()
+    logging.info("Steam tag 爬蟲執行完畢！")
