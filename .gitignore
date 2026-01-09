@@ -211,6 +211,8 @@ __marimo__/
 poetry.lock
 pyproject.toml
 /key
-/data/raw
+/data/raw/game_info
+/data/raw/game_tag
+/data/raw/game_review
 /data/processed
 /data/vector

@@ -12,4 +12,6 @@ logging.basicConfig(
 if __name__ == "__main__":
     tag_scraper = SteamScraperBase(
         scraper_type="game_tag", url_type=GAME_TAG_URL, max_input_files=1)
+    # tag_scraper.id_file_num = 2
+    # tag_scraper.output_file_num = 3
     tag_scraper.run()

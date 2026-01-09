@@ -43,6 +43,7 @@ class SteamScraperBase:
         self.max_results_per_file = 2000
         self.max_retries = 5
         self.retry_delay_base = 15
+        self.max_data_per_save = 200
 
         # 執行狀態追蹤
         self.id_file_num = 1
@@ -197,7 +198,8 @@ class SteamScraperBase:
                     self.last_appid = app_id
                     self.data_count += 1
 
-                    self._save_batch_data()
+                    if self.data_count % self.max_data_per_save == 0:
+                        self._save_batch_data()
 
                     if len(self.current_data_list) >= self.max_results_per_file:
                         logger.info(
