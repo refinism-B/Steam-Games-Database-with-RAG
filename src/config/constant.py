@@ -13,13 +13,13 @@ GAME_REVIEW_URL = "https://store.steampowered.com/appreviews/{}?json=1&language=
 GAME_TAG_URL = "https://steamspy.com/api.php?request=appdetails&appid={}"
 
 # raw資料存放路徑
-RAW_GAME_ID_SUBFOLDER = r"data\raw\game_id"
-RAW_ID_METADATA_SUBFOLDER = r"data\raw\game_id\metadata"
+RAW_GAME_ID_SUBFOLDER = "data/raw/game_id"
+RAW_ID_METADATA_SUBFOLDER = "data/raw/game_id/metadata"
 
-RAW_DATA_PATH = r"data\raw\{}"
-RAW_METADATA_PATH = r"data\raw\{}\metadata"
+RAW_DATA_PATH = "data/raw/{}"
+RAW_METADATA_PATH = "data/raw/{}/metadata"
 
-PROCESSED_DATA_PATH = r"data\processed\{}"
+PROCESSED_DATA_PATH = "data/processed/{}"
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
