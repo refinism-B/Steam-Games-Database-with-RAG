@@ -19,10 +19,11 @@ RAW_ID_METADATA_SUBFOLDER = "data/raw/game_id/metadata"
 RAW_DATA_PATH = "data/raw/{}"
 RAW_METADATA_PATH = "data/raw/{}/metadata"
 
+# processed資料存放路徑
 PROCESSED_DATA_PATH = "data/processed/{}"
 
+# 專案根目錄路徑
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
 
 # game info保留的欄位
 INFO_MAIN_COLS = ['steam_appid', 'name', 'type', 'required_age', 'is_free', 'detailed_description',
@@ -44,3 +45,7 @@ METADATA_COLS = ['type', 'name', 'steam_appid', 'required_age', 'is_free', 'supp
                  'positive_rate', 'rate_percentage', 'languages', 'tags', 'metacritic_score']
 CONTEXT_COLS = ['name', 'detailed_description', 'about_the_game',
                 'short_description', 'developers', 'publishers', 'categories', 'genres', 'tags']
+
+
+CHROMA_COLLECTION_NAME = "steam_games_DB"
+CHROMA_PERSIST_DIR = PROJECT_ROOT / "data/vector"
