@@ -30,7 +30,7 @@
 
 ```mermaid
 graph TD
-    subgraph Data_Ingestion [1. 資料擷取 (Data Ingestion)]
+    subgraph Data_Ingestion ["1. 資料擷取 (Data Ingestion)"]
         API[Flask API] -->|觸發| Crawler[多執行緒爬蟲]
         Crawler -->|Fetch| SteamAPI[Steam Web API]
         SteamAPI -->|Response| RawData[Raw JSON Data<br/>(Info, Review, Tag)]
