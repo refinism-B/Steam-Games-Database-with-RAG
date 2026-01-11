@@ -3,6 +3,8 @@ import time
 import os
 import uuid
 from pathlib import Path
+from src.database.postgreSQL_conn import upsert_documents
+from src.database import postgreSQL_conn as pgc
 
 import tiktoken
 from langchain_core.embeddings import Embeddings
@@ -53,12 +55,12 @@ def tiktoken_len(text):
     return len(tokens)
 
 
-def connect_to_vector_db(collection_name, embeddings):
-    return Chroma(
-        collection_name=collection_name,
-        embedding_function=embeddings,
-        persist_directory=CHROMA_PERSIST_DIR
-    )
+# def connect_to_vector_db(collection_name, embeddings):
+#     return Chroma(
+#         collection_name=collection_name,
+#         embedding_function=embeddings,
+#         persist_directory=CHROMA_PERSIST_DIR
+#     )
 
 
 def parent_document_slicer(doc_list, parent_splitter, child_splitter):
@@ -98,39 +100,41 @@ def parent_document_slicer(doc_list, parent_splitter, child_splitter):
     return all_docs_to_vectorize
 
 
-def deduplicated_docs(total_docs):
-    """
-    在送入 Chroma 前，根據 doc_id 過濾掉重複的文件。
-    保留最後出現的那個版本（或根據需求保留第一個）。
-    """
-    if not total_docs:
-        return [], []
+# def deduplicated_docs(total_docs):
+#     """
+#     在送入 Chroma 前，根據 doc_id 過濾掉重複的文件。
+#     保留最後出現的那個版本（或根據需求保留第一個）。
+#     """
+#     if not total_docs:
+#         return [], []
 
-    # 1. 提取所有 ID
-    ids = [doc.metadata['doc_id'] for doc in total_docs]
+#     # 1. 提取所有 ID
+#     ids = [doc.metadata['doc_id'] for doc in total_docs]
 
-    # 2. 利用 Dictionary Key 唯一性進行去重
-    #    若有重複 ID，後面的會覆蓋前面的 (zip 會依序配對)
-    unique_data = {doc_id: doc for doc_id, doc in zip(ids, total_docs)}
+#     # 2. 利用 Dictionary Key 唯一性進行去重
+#     #    若有重複 ID，後面的會覆蓋前面的 (zip 會依序配對)
+#     unique_data = {doc_id: doc for doc_id, doc in zip(ids, total_docs)}
 
-    # 3. 轉回 List
-    unique_ids = list(unique_data.keys())
-    unique_docs = list(unique_data.values())
+#     # 3. 轉回 List
+#     unique_ids = list(unique_data.keys())
+#     unique_docs = list(unique_data.values())
 
-    print(f"去重前資料筆數: {len(total_docs)}")
-    print(
-        f"去重後資料筆數: {len(unique_docs)} (移除 {len(total_docs) - len(unique_docs)} 筆重複)")
+#     print(f"去重前資料筆數: {len(total_docs)}")
+#     print(
+#         f"去重後資料筆數: {len(unique_docs)} (移除 {len(total_docs) - len(unique_docs)} 筆重複)")
 
-    return unique_docs, unique_ids
+#     return unique_docs, unique_ids
 
 
 def main():
     print("正在連線 Embedding 模型...")
-    embeddings = LmStudioEmbeddings(
-        model_name=EMBEDDING_MODEL, url=EMBEDDING_URL)
+    client = pgc.connect_to_ollama(OLLAMA_URL="http://192.168.0.109:11434/")
+    # conn, cur = pgc.connect_to_pgSQL()
+    # embeddings = LmStudioEmbeddings(
+    #     model_name=EMBEDDING_MODEL, url=EMBEDDING_URL)
 
-    print("正在連線 ChromaDB...")
-    vector_store = connect_to_vector_db(CHROMA_COLLECTION_NAME, embeddings)
+    # print("正在連線 ChromaDB...")
+    # vector_store = connect_to_vector_db(CHROMA_COLLECTION_NAME, embeddings)
 
     parent_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
@@ -178,27 +182,40 @@ def main():
             total_docs = parent_document_slicer(
                 doc_list, parent_splitter, child_splitter)
 
-            # 2. [修正] 執行去重逻辑
-            #    這裡會過濾掉 total_docs 中重複的 ID，確保 batch 內不會有衝突
-            unique_docs, unique_ids = deduplicated_docs(total_docs)
-
-            print(f"準備寫入 {len(unique_docs)} 筆資料...")
-
-            # 3. 批次寫入 (使用去重後的 unique_docs 與 unique_ids)
+            # 2. 輸入PostgreSQL資料庫
             batch_size = 100
-            for i in tqdm(range(0, len(unique_docs), batch_size), desc=f"寫入進度 ({input_file})"):
-                batch_docs = unique_docs[i: i + batch_size]
-                batch_ids = unique_ids[i: i + batch_size]
+            for i in tqdm(range(0, len(total_docs), batch_size), desc=f"寫入進度 ({input_file})"):
+                batch_docs = total_docs[i: i + batch_size]
 
                 try:
-                    vector_store.add_documents(
-                        documents=batch_docs,
-                        ids=batch_ids
-                    )
+                    upsert_documents(batch_docs, client, batch_size=100)
+
                 except Exception as e:
                     # 這裡捕捉到的錯誤會顯示出來，不會讓程式崩潰
-                    # 因為已經去重過，理論上 Duplicate ID Error 不會再發生
                     print(f"\n寫入批次 {i} 時發生錯誤: {e}")
+
+            # )
+            # 2. [修正] 執行去重逻辑
+            #    這裡會過濾掉 total_docs 中重複的 ID，確保 batch 內不會有衝突
+            # unique_docs, unique_ids = deduplicated_docs(total_docs)
+
+            # print(f"準備寫入 {len(unique_docs)} 筆資料...")
+
+            # 3. 批次寫入 (使用去重後的 unique_docs 與 unique_ids)
+            # batch_size = 100
+            # for i in tqdm(range(0, len(unique_docs), batch_size), desc=f"寫入進度 ({input_file})"):
+            #     batch_docs = unique_docs[i: i + batch_size]
+            #     batch_ids = unique_ids[i: i + batch_size]
+
+            #     try:
+            #         vector_store.add_documents(
+            #             documents=batch_docs,
+            #             ids=batch_ids
+            #         )
+            #     except Exception as e:
+            #         # 這裡捕捉到的錯誤會顯示出來，不會讓程式崩潰
+            #         # 因為已經去重過，理論上 Duplicate ID Error 不會再發生
+            #         print(f"\n寫入批次 {i} 時發生錯誤: {e}")
 
             print(f"成功處理: {input_file}")
             input_num += 1

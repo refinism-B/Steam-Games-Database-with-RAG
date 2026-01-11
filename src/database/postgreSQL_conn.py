@@ -1,10 +1,12 @@
-import os
 import json
+import os
+import time
 
 import psycopg2
 from dotenv import load_dotenv
 from ollama import Client
 from pgvector.psycopg2 import register_vector
+from psycopg2.extras import execute_values
 
 load_dotenv()
 
@@ -31,51 +33,52 @@ def connect_to_pgSQL():
     return conn, cur
 
 
-def connect_to_ollama():
+def connect_to_ollama(OLLAMA_URL=OLLAMA_URL):
     client = Client(OLLAMA_URL)
     return client
 
 
-def upsert_documents(documents):
-    client = connect_to_ollama()
+def upsert_documents(documents, client, batch_size=20):
+    # client = connect_to_ollama()
     conn, cur = connect_to_pgSQL()
 
     upsert_query = """
     INSERT INTO document_embeddings (doc_id, content, metadata, embedding)
-    VALUES (%s, %s, %s, %s)
-    ON CONFLICT (doc_id) 
-    DO UPDATE SET 
+    VALUES %s
+    ON CONFLICT (doc_id)
+    DO UPDATE SET
         content = EXCLUDED.content,
         metadata = EXCLUDED.metadata,
         embedding = EXCLUDED.embedding;
     """
 
     try:
-        data_count = 1
-        for doc in documents:
-            # 先取出doc_id作為unique key
-            doc_id = doc.metadata.get("doc_id")
-            if not doc_id:
-                print("跳過無 doc_id 的文件")
-                continue
+        for i in range(0, len(documents), batch_size):
+            batch = documents[i: i + batch_size]
 
-            # 生成向量
-            text = doc.page_content
-            response = client.embed(model='bge-m3', input=text)
-            embedding = response['embeddings'][0]
+            # 1. 準備批次文字與 Metadata
+            batch_texts = [doc.page_content for doc in batch]
+            batch_metadatas = [json.dumps(doc.metadata) for doc in batch]
+            batch_ids = [doc.metadata.get("doc_id") for doc in batch]
 
-            # 寫入資料庫
-            cur.execute(
-                upsert_query,
-                (doc_id, text, json.dumps(doc.metadata), embedding)
-            )
+            # 2. 批次生成向量
+            current_end = min(i + batch_size, len(documents))
+            print(f"開始進行批次向量化資料:第{i}筆到第{current_end}筆")
+            response = client.embed(model='bge-m3', input=batch_texts)
+            batch_embeddings = response['embeddings']
 
-            if data_count % 100 == 0:
-                conn.commit()
-            data_count += 1
+            # 3. 整理資料格式
+            data_to_upsert = [
+                (doc_id, text, meta, emb)
+                for doc_id, text, meta, emb in zip(batch_ids, batch_texts, batch_metadatas, batch_embeddings)
+                if doc_id  # 確保 doc_id 存在
+            ]
 
-        conn.commit()
-        print(f"成功處理 {len(documents)} 筆資料")
+            # 4. 執行批次寫入
+            print(f"批次寫入資料庫:第{i}筆到第{current_end}筆")
+            execute_values(cur, upsert_query, data_to_upsert)
+            conn.commit()
+            time.sleep(1)
 
     except Exception as e:
         print(f"發生錯誤: {e}")
