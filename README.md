@@ -33,26 +33,26 @@ graph TD
     subgraph Data_Ingestion ["1. 資料擷取 (Data Ingestion)"]
         API[Flask API] -->|觸發| Crawler[多執行緒爬蟲]
         Crawler -->|Fetch| SteamAPI[Steam Web API]
-        SteamAPI -->|Response| RawData[Raw JSON Data<br/>(Info, Review, Tag)]
+        SteamAPI -->|Response| RawData["Raw JSON Data<br/>(Info, Review, Tag)"]
     end
 
     subgraph ETL_Process [2. ETL 處理]
         RawData --> Clean[ETL_json.py<br/>清洗與合併]
         Clean --> ProcessedJSON[Processed JSON]
         ProcessedJSON --> Struct[ETL_document.py<br/>文件結構化]
-        Struct --> Docs[Document Objects<br/>(Context + Metadata)]
+        Struct --> Docs["Document Objects<br/>(Context + Metadata)"]
     end
 
     subgraph RAG_System [3. RAG & Vector Config]
         Docs --> Split[Parent-Child Splitter]
-        Split --> Embed[Embedding Model<br/>(BGE-M3 via LM Studio)]
+        Split --> Embed["Embedding Model<br/>(BGE-M3 via LM Studio)"]
         Embed --> VectorDB[(Vector DB<br/>Chroma)]
     end
 
     subgraph Application [4. 應用層]
         Query[User Query] -->|Ask| Agent[LangChain Agent]
         Agent <-->|Retrieve| VectorDB
-        Agent -->|Generate| LLM[LLM<br/>(Gemini / Local)]
+        Agent -->|Generate| LLM["LLM<br/>(Gemini / Local)"]
         LLM --> Answer[Final Answer]
     end
 
