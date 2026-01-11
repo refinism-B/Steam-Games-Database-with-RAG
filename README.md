@@ -30,16 +30,16 @@
 
 ```mermaid
 graph TD
-    subgraph Data_Ingestion ["1. 資料擷取 (Data Ingestion)"]
-        API[Flask API] -->|觸發| Crawler[多執行緒爬蟲]
+    subgraph Data_Ingestion ["1. Data Ingestion"]
+        API[Flask API] -->|Trigger| Crawler[Multi-threaded Crawler]
         Crawler -->|Fetch| SteamAPI[Steam Web API]
         SteamAPI -->|Response| RawData["Raw JSON Data<br/>(Info, Review, Tag)"]
     end
 
-    subgraph ETL_Process [2. ETL 處理]
-        RawData --> Clean[ETL_json.py<br/>清洗與合併]
+    subgraph ETL_Process [2. ETL Process]
+        RawData --> Clean[ETL_json.py<br/>Clean & Merge]
         Clean --> ProcessedJSON[Processed JSON]
-        ProcessedJSON --> Struct[ETL_document.py<br/>文件結構化]
+        ProcessedJSON --> Struct[ETL_document.py<br/>Document Structuring]
         Struct --> Docs["Document Objects<br/>(Context + Metadata)"]
     end
 
@@ -49,7 +49,7 @@ graph TD
         Embed --> VectorDB[(Vector DB<br/>Chroma)]
     end
 
-    subgraph Application [4. 應用層]
+    subgraph Application [4. Application Layer]
         Query[User Query] -->|Ask| Agent[LangChain Agent]
         Agent <-->|Retrieve| VectorDB
         Agent -->|Generate| LLM["LLM<br/>(Gemini / Local)"]
