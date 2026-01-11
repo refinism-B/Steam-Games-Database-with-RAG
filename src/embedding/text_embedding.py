@@ -61,21 +61,25 @@ def connect_to_vector_db(collection_name, embeddings):
     )
 
 
-def parent_document_slicer(parent_docs, child_splitter):
+def parent_document_slicer(doc_list, parent_splitter, child_splitter):
     """
     執行 Parent-Document 切割
     """
     all_docs_to_vectorize = []
 
-    for doc in parent_docs:
+    parent_docs = parent_splitter.split_documents(doc_list)
+
+    for pi, doc in enumerate(parent_docs):
         steam_appid = doc.metadata.get("steam_appid")
         if not steam_appid:
-            parent_id = str(uuid.uuid4())
+            base_id = str(uuid.uuid4())
         else:
-            parent_id = str(steam_appid)
+            base_id = str(steam_appid)
 
-        doc.metadata["doc_id"] = parent_id
-        doc.metadata["parent_id"] = parent_id
+        current_parent_doc_id = base_id + f"_p0{str(pi)}"
+
+        doc.metadata["doc_id"] = current_parent_doc_id
+        doc.metadata["parent_id"] = doc.metadata["doc_id"]
         doc.metadata["is_parent"] = True
 
         all_docs_to_vectorize.append(doc)
@@ -83,8 +87,8 @@ def parent_document_slicer(parent_docs, child_splitter):
         split_docs = child_splitter.split_documents([doc])
 
         for i, sdoc in enumerate(split_docs):
-            sdoc.metadata["parent_id"] = parent_id
-            sdoc.metadata["doc_id"] = f"{parent_id}_c{i}"
+            sdoc.metadata["parent_id"] = doc.metadata["doc_id"]
+            sdoc.metadata["doc_id"] = current_parent_doc_id + f"_c0{str(i)}"
             sdoc.metadata["is_parent"] = False
             all_docs_to_vectorize.append(sdoc)
 
@@ -129,6 +133,12 @@ def main():
     print("正在連線 ChromaDB...")
     vector_store = connect_to_vector_db(CHROMA_COLLECTION_NAME, embeddings)
 
+    parent_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=250,
+        length_function=tiktoken_len
+    )
+
     child_splitter = RecursiveCharacterTextSplitter(
         chunk_size=300,
         chunk_overlap=70,
@@ -166,7 +176,8 @@ def main():
                         for d in data_list]
 
             # 1. 切割與 ID 生成
-            total_docs = parent_document_slicer(doc_list, child_splitter)
+            total_docs = parent_document_slicer(
+                doc_list, parent_splitter, child_splitter)
 
             # 2. [修正] 執行去重逻辑
             #    這裡會過濾掉 total_docs 中重複的 ID，確保 batch 內不會有衝突

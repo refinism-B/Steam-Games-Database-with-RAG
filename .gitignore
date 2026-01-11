@@ -216,3 +216,4 @@ pyproject.toml
 /data/raw/game_review
 /data/processed
 /data/vector
+/docs/prompt.md
