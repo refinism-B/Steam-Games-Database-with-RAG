@@ -217,3 +217,4 @@ pyproject.toml
 /data/processed
 /data/vector
 /docs/prompt.md
+__init__.py

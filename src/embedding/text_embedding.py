@@ -100,7 +100,6 @@ def parent_document_slicer(doc_list, parent_splitter, child_splitter):
 
 def deduplicated_docs(total_docs):
     """
-    [CRITICAL FIX] 恢復你原本的去重邏輯
     在送入 Chroma 前，根據 doc_id 過濾掉重複的文件。
     保留最後出現的那個版本（或根據需求保留第一個）。
     """
