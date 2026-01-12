@@ -4,9 +4,11 @@
 
 ## 0. 環境與前置作業 (Environment Setup)
 
-- **環境變數**: 需配置 `.env` 檔案，包含 `STEAM_API_KEY` 與資料庫設定。
+- **環境變數**: 需配置 `.env` 檔案，包含 `STEAM_API_KEY`、`OLLAMA_URL` 與 `PG_HOST`/`PG_PASSWORD` 等資料庫設定。
 - **依賴套件**: 透過 `requirements.txt` 安裝 Python 依賴。
-- **Embedding 模型 Server**: 專案設定連線至本地 LM Studio (預設 IP: `192.168.0.109:1234`)，使用 `text-embedding-bge-m3` 模型。
+- **Cloud Services**:
+    -   **Database**: 使用雲端 PostgreSQL (支援 `pgvector` 擴充)。
+    -   **Embedding Model**: 介接雲端 Ollama 服務 (預設使用 `bge-m3` 模型)。
 
 ## 1. 資料擷取 (Data Ingestion)
 
@@ -33,8 +35,8 @@ ETL 分為兩個階段：清洗合併 (`ETL_json.py`) 與 文件結構化 (`ETL_
     -   **合併**: 依據 `appid` 將 Info, Review, Tag 資料合併為單一物件。
     -   **清洗邏輯**:
         -   **HTML 去除**: 使用 `BeautifulSoup` 去除描述欄位中的 HTML 標籤。
-        -   **硬體需求攤平**: 解析 `pc_requirements`, `mac_requirements` 等欄位，將巢狀結構攤平為 `pc_requirements_minimum` 等格式。
-        -   **數值處理**: 轉換價格 (cent to unit)、計算好評率 (`positive_rate`)。
+        -   **硬體需求攤平**: 解析 `pc_requirements`, `mac_requirements` 等欄位，將巢狀結構攤平。
+        -   **數值處理**: 轉換價格、計算好評率 (`positive_rate`)。
     -   **輸出**: 存入 `data/processed/json_data/`。
 
 2.  **文件結構化 (`src/ETL/ETL_document.py`)**:
@@ -51,32 +53,34 @@ ETL 分為兩個階段：清洗合併 (`ETL_json.py`) 與 文件結構化 (`ETL_
 1.  **文件讀取與切割**:
     -   讀取 Document 格式的 JSON 檔案。
     -   **Parent-Document Splitter**:
-        -   **Parent Chunk**: 1000 tokens (負責檢索上下文)。
-        -   **Child Chunk**: 300 tokens (負責向量計算)。
+        -   **Parent Chunk**: 1000 tokens (負責檢索完整上下文)。
+        -   **Child Chunk**: 300 tokens (負責向量相似度計算)。
     -   **ID 關聯**: 建立 Parent-Child ID 對應 (`_p0x`, `_c0x`)。
-2.  **去重複 (Deduplication)**:
-    -   在寫入前根據 `doc_id` 檢查並移除重複文件，確保資料庫唯一性。
-3.  **向量化 (Embedding)**:
-    -   透過 `LmStudioEmbeddings` class 呼叫本地 API (`text-embedding-bge-m3`)。
-4.  **向量資料庫儲存**:
-    -   使用 `langchain_chroma` 將向量與 Metadata 寫入本地 ChromaDB (`data\vector`)。
+2.  **向量化 (Embedding)**:
+    -   呼叫雲端 **Ollama API** 進行 Embedding (使用 `bge-m3` 模型)。
+    -   批次處理以提升效率。
+3.  **向量資料庫儲存 (Cloud PostgreSQL)**:
+    -   透過 `src/database/postgreSQL_conn.py` 連線至雲端資料庫。
+    -   使用 `UPSERT` 邏輯寫入 `document_embeddings` 表格 (避免重複 ID)。
+    -   同時儲存 `embedding` (向量), `content` (文字), `metadata` (屬性)。
 
-## 4. LLM & RAG (Prototype in Notebook)
+## 4. LLM & RAG (Implemented in Notebook)
 
-目前 RAG 功能主要於 `notebooks/llm.ipynb` 進行實驗與驗證，架構如下：
+目前 RAG 檢索與對話邏輯位於 `notebooks/llm.ipynb`。
 
-1.  **LLM 模型選擇 (Flexible LLM Backend)**:
-    -   支援 **Google Gemini** (`gemini-3-flash-preview`) 透過 `langchain_google_genai` 串接。
-    -   支援 **LM Studio** (Local LLM, 如 `gemma-3-12b-it`) 透過 `ChatOpenAI` 介面相容串接。
-    -   使用 `stream_chat_bot` 類別封裝，支援串流輸出 (Streaming) 與工具調用 (Tool Calling)。
+1.  **LLM 模型選擇**:
+    -   可切換 **Google Gemini** (Cloud) 或 **LM Studio** (Local) 作為推論核心。
+    -   使用 `stream_chat_bot` 支援串流輸出與 Tool Calling。
 
 2.  **RAG 檢索機制 (Parent-Document Retrieval)**:
-    -   **檢索工具 (`get_qa` Tool)**: 定義為 LangChain Tool，供 LLM 自主決定何時調用。
-    -   **兩階段檢索邏輯**:
-        1.  先根據問題搜尋最相似的 $N$ 個子文件 (Child Chunks)。
-        2.  取出對應的父文件 ID (`parent_id`) 進行去重 (`seen_ids`)。
-        3.  回傳完整的父文件內容作為 Context，保留完整上下文。
+    -   **檢索工具 (`get_qa`)**:
+        -   LLM 根據使用者問題自動決定是否調用檢索工具。
+    -   **兩階段優化流程**:
+        1.  **子文件檢索**: 使用 `vector_store.similarity_search` 找出 Top-N 個最相關的 Child Chunks。
+        2.  **父文件回溯**: 從 Child Chunks 解析出唯一的 `parent_id`。
+        3.  **完整上下文獲取**: 根據 `parent_id` 從 PostgreSQL 拉取完整的 Parent Documents。
+        4.  **去重**: 確保回傳給 LLM 的是獨特且完整的遊戲資訊片段。
 
-3.  **對話流程 (Agent Loop)**:
-    -   System Prompt 設定角色與行為。
-    -   進入對話迴圈：接收 User Input -> LLM 思考 -> 判斷是否 Call Tool -> 執行檢索 -> 回傳 Tool Result -> LLM 生成最終回答。
+3.  **系統提示與互動**:
+    -   System Prompt 設定角色為「Steam 遊戲資料研究員」。
+    -   回答嚴格基於檢索到的 Context，若無資料則誠實告知。

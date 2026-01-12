@@ -19,7 +19,10 @@
     -   **結構化**: 將異質資料轉換為適合 RAG 檢索的 Document 格式。
 -   **RAG 檢索增強生成**:
     -   **Hybrid Retrieval**: 採用 Parent-Document Retriever 策略，兼顧檢索精準度 (Child Chunk) 與上下文完整性 (Parent Chunk)。
-    -   **Local & Cloud LLM**: 支援 Google Gemini 與本地 LM Studio 模型 (如 Gemma, Llama 3) 的彈性切換。
+    -   **Cloud Integration**:
+        -   **Vector DB**: 使用 **Cloud PostgreSQL (pgvector)** 儲存與檢索高維向量。
+        -   **Embedding**: 介接 **Cloud Ollama** 服務進行高效文本向量化。
+    -   **Flexible LLM**: 支援 Google Gemini (Cloud) 與 LM Studio (Local) 切換。
 -   **Flask API**: 提供 RESTful API 介面，可遠端觸發背景爬蟲任務。
 
 ---
@@ -45,8 +48,8 @@ graph TD
 
     subgraph RAG_System [3. RAG & Vector Config]
         Docs --> Split[Parent-Child Splitter]
-        Split --> Embed["Embedding Model<br/>(BGE-M3 via LM Studio)"]
-        Embed --> VectorDB[(Vector DB<br/>Chroma)]
+        Split --> Embed["Embedding Model<br/>(Cloud Ollama)"]
+        Embed --> VectorDB[(Vector DB<br/>Cloud PostgreSQL)]
     end
 
     subgraph Application [4. Application Layer]
@@ -70,17 +73,18 @@ graph TD
 ```text
 Steam-Games-Database-with-RAG/
 ├── app.py                 # Flask 應用程式入口 (API Server)
-├── data/                  # 資料儲存區 (Raw, Processed, Vector DB)
+├── data/                  # 資料儲存區 (Raw, Processed)
 ├── docs/                  # 專案文件
 ├── notebooks/             # 實驗與測試用的 Jupyter Notebooks
 ├── src/                   # 核心原始碼
 │   ├── crawler/           # 爬蟲模組 (GameID, Info, Review, Tag)
 │   ├── ETL/               # 資料清洗與轉換腳本
-│   ├── embedding/         # 文本向量化邏輯
+│   ├── embedding/         # 文本向量化邏輯 (Cloud Ollama)
 │   ├── llm/               # RAG Agent 與 LLM 串接
+│   ├── database/          # 資料庫連線模組 (PostgreSQL)
 │   └── utils/             # 通用工具
 ├── requirements.txt       # Python 依賴清單
-└── .env                   # 環境變數設定 (API Keys)
+└── .env                   # 環境變數設定 (API Keys, DB Config)
 ```
 
 ---
@@ -106,16 +110,30 @@ pip install -r requirements.txt
 
 ### 2. 設定環境變數
 
-在專案根目錄建立 `.env` 檔案，並填入必要的 API Key：
+在專案根目錄建立 `.env` 檔案，填入 Database 連線資訊與 API Key：
 
 ```ini
 # .env
-STEAM_API_KEY=your_steam_api_key
-GOOGLE_API_KEY=your_google_gemini_key  # 若使用 Gemini
-# 其他資料庫配置...
-```
 
-> **Note**: 本地 Embedding Server (LM Studio) 需預先啟動並開啟 Server Mode，預設端口 `1234`。
+# Steam API
+STEAM_API_KEY=your_steam_api_key
+
+# Database Config (Cloud PostgreSQL)
+PG_HOST=your_db_host
+PG_DATABASE=your_db_name
+PG_USERNAME=your_db_user
+PG_PASSWORD=your_db_password
+PG_PORT=5432
+PG_COLLECTION=steam_games_DB
+
+# Embedding Service (Cloud Ollama)
+OLLAMA_URL=https://your-ollama-service-url
+EMBEDDING_MODEL=bge-m3
+
+# LLM Provider
+GOOGLE_API=your_google_gemini_key  # 若使用 Gemini
+# OLLAMA_LOCAL=http://localhost:11434 # 若使用 Local Ollama
+```
 
 ### 3. 啟動爬蟲服務
 
@@ -132,14 +150,14 @@ python app.py
 
 > [!TIP]
 > **建議雲端部署 (Cloud Deployment Recommended)**
-> 由於 Steam 遊戲資料量龐大 (約 150,000 筆)，完整爬取極為耗時。建議將本專案部署至雲端平台 (如 Zeabur, AWS, GCP)，並透過 `app.py` 提供的 API 介面在背景觸發爬蟲任務，以確保長時間執行的穩定性。
+> 由於 Steam 遊戲資料量龐大 (約 150,000 筆)，完整爬取極為耗時。建議將本專案部署至雲端平台 (如 Zeabur, AWS, GCP)，並透過 `app.py` 提供的 API 介面在背景觸發爬蟲任務。
 
 ### 4. 執行 ETL 與 RAG 流程
 
 目前 ETL 與 RAG 功能建議透過 Jupyter Notebook 進行互動式操作與驗證：
 
 -   **資料清洗**: 執行 `notebooks/ETL_json.ipynb`
--   **建立向量庫**: 執行 `notebooks/text_embedding.ipynb`
+-   **建立向量庫**: 執行 `notebooks/text_embedding.ipynb` (將調用 Cloud Ollama 與 PostgreSQL)
 -   **RAG 對話測試**: 執行 `notebooks/llm.ipynb`
 
 ---
@@ -149,9 +167,10 @@ python app.py
 - [x] **資料擷取**: 實作 Steam 基礎資訊、評論與標籤爬蟲。
 - [x] **基礎 ETL**: 完成 JSON 清洗、攤平與結構化轉換。
 - [x] **RAG 原型**: 建立基於 Parent-Document 的檢索系統。
+- [x] **資料庫優化**: 導入 Cloud PostgreSQL (pgvector) 支援高效向量檢索。
+- [x] **模型服務化**: 介接 Cloud Ollama 作為 Embedding 服務端點。
 - [ ] **雲端部署**: 容器化應用並部署至 Zeabur/GCP。
 - [ ] **GUI 介面**: 開發 Streamlit 或 Gradio 介面，提供友善的對話視窗。
-- [ ] **資料庫優化**: 將 metadata 遷移至關聯式資料庫 (PostgreSQL) 以支援混合檢索。
 
 ---
 
