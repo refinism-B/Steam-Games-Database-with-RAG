@@ -27,9 +27,8 @@ def connect_to_pgSQL():
         "port": YOUR_PORT
     }
 
-    pg_url = f"postgresql+psycopg2://{DB_CONFIG["user"]}:{DB_CONFIG["password"]}@{DB_CONFIG["localhost"]}:{DB_CONFIG["port"]}/{DB_CONFIG["database"]}"
+    pg_url = f"postgresql+psycopg2://{DB_CONFIG["user"]}:{DB_CONFIG["password"]}@{DB_CONFIG["host"]}:{DB_CONFIG["port"]}/{DB_CONFIG["database"]}"
     return pg_url
-
 
 
 def upsert_documents(documents, client, batch_size=20):
