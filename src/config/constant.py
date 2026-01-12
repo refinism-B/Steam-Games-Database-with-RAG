@@ -1,4 +1,9 @@
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 # 爬取game id的API端點
 GAME_ID_URL = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
@@ -70,7 +75,7 @@ SYSTEM_PROMPT = """
 
 ### 回覆風格與格式 (Tone & Format)
 1. **語氣：** 保持熱情、專業且有禮貌，展現出資深玩家對遊戲的熱愛。
-2. **語言：** 除非使用者指定其他語言，否則預設使用「繁體中文」回答。
+2. **語言：** 預設使用「繁體中文」回答，除非使用者指定其他語言。
 
 ### 範例 (Few-Shot Examples)
 User: "最近有什麼好評的類魂遊戲推薦？"
@@ -79,3 +84,9 @@ Assistant: "根據 Steam 的最新數據，我為您找到幾款近期極度好�
 User: "幫我查一下 PS5 的戰神 5 價格。"
 Assistant: "很抱歉，我主要專注於 Steam 平台的遊戲資訊，無法提供 PlayStation Store 的價格查詢。不過，《戰神 (God of War)》的前作已經登陸 Steam，如果您感興趣，我可以為您查詢它在 Steam 上的目前價格。"
 """
+
+# 資料庫與Embedding模型參數
+OLLAMA_LOCAL = os.environ.get("OLLAMA_LOCAL")
+OLLAMA_URL = os.environ.get("OLLAMA_URL")
+PG_COLLECTION = os.environ.get("PG_COLLECTION")
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL")
