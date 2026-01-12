@@ -27,19 +27,12 @@ def connect_to_pgSQL():
         "port": YOUR_PORT
     }
 
-    conn = psycopg2.connect(**DB_CONFIG)
-    register_vector(conn)  # 註冊 pgvector 型別
-    cur = conn.cursor()
-    return conn, cur
+    pg_url = f"postgresql+psycopg2://{DB_CONFIG["user"]}:{DB_CONFIG["password"]}@{DB_CONFIG["localhost"]}:{DB_CONFIG["port"]}/{DB_CONFIG["database"]}"
+    return pg_url
 
-
-def connect_to_ollama(OLLAMA_URL=OLLAMA_URL):
-    client = Client(OLLAMA_URL)
-    return client
 
 
 def upsert_documents(documents, client, batch_size=20):
-    # client = connect_to_ollama()
     conn, cur = connect_to_pgSQL()
 
     upsert_query = """
