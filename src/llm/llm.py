@@ -7,10 +7,11 @@ from langchain.messages import (AIMessageChunk, HumanMessage, SystemMessage,
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
 from langchain_ollama import OllamaEmbeddings
 from langchain_openai import ChatOpenAI
 from langchain_postgres.vectorstores import PGVector
-from openai import OpenAI
+from openai import APIConnectionError, OpenAI
 
 from src.config.constant import (EMBEDDING_MODEL, OLLAMA_LOCAL, OLLAMA_URL,
                                  PG_COLLECTION, PROJECT_ROOT, SYSTEM_PROMPT)
@@ -139,62 +140,74 @@ class stream_chat_bot:
         主對話生成函式（生成器形式）。
         逐步執行 LLM 回應與工具調用，並即時回傳每一步的結果。
         """
-        # 若對話紀錄超過三項，進行摘要
-        if len(self.message) > 3:
-            self._summarize_history()
+        try:
+            # 若對話紀錄超過三項，進行摘要
+            if len(self.message) > 3:
+                self._summarize_history()
 
-        # 進行問題轉譯
-        refined_text = self._rephrase_query(text)
+            # 進行問題轉譯
+            refined_text = self._rephrase_query(text)
 
-        # 將轉役內容加入訊息列表
-        self.message.append(HumanMessage(refined_text))
+            # 將轉役內容加入訊息列表
+            self.message.append(HumanMessage(refined_text))
 
-        while True:
-            # 呼叫 LLM，傳入完整訊息歷史
-            final_ai_message = AIMessageChunk(content="")
-            for chunk in self.llm_with_tools.stream(self.message):
-                final_ai_message += chunk
-                if hasattr(chunk, 'content') and chunk.content:
-                    yield self.str_parser.invoke(chunk)
+            while True:
+                    # 呼叫 LLM，傳入完整訊息歷史
+                    final_ai_message = AIMessageChunk(content="")
+                    for chunk in self.llm_with_tools.stream(self.message):
+                        final_ai_message += chunk
+                        if hasattr(chunk, 'content') and chunk.content:
+                            yield self.str_parser.invoke(chunk)
 
-            response = final_ai_message
+                    response = final_ai_message
 
-            # 將 LLM 回應加入訊息列表
-            self.message.append(response)
+                    # 將 LLM 回應加入訊息列表
+                    self.message.append(response)
 
-            # 檢查 LLM 是否要求呼叫工具
-            is_tools_call = False
-            for tool_call in response.tool_calls:
-                is_tools_call = True
+                    # 檢查 LLM 是否要求呼叫工具
+                    is_tools_call = False
+                    for tool_call in response.tool_calls:
+                        is_tools_call = True
 
-                if display_data:
-                    # # 顯示 LLM 要執行的工具名稱與參數
-                    # 完整訊息
-                    msg = f'[執行]: {tool_call["name"]}({tool_call["args"]})\n-----------\n'
-                    yield msg  # 使用 yield 讓結果能即時顯示在輸出中
+                        if display_data:
+                            # # 顯示 LLM 要執行的工具名稱與參數
+                            # 完整訊息
+                            msg = f'[執行]: {tool_call["name"]}({tool_call["args"]})\n-----------\n'
+                            yield msg  # 使用 yield 讓結果能即時顯示在輸出中
 
-                # 實際執行工具（根據工具名稱動態呼叫對應物件）
-                tool_result = globals()[tool_call['name']].invoke(
-                    tool_call['args'])
+                        # 實際執行工具（根據工具名稱動態呼叫對應物件）
+                        tool_result = globals()[tool_call['name']].invoke(
+                            tool_call['args'])
 
-                if display_data:
-                    # # 顯示工具執行結果
-                    msg = f'[結果]: {tool_result}\n-----------\n'
-                    yield msg
+                        if display_data:
+                            # # 顯示工具執行結果
+                            msg = f'[結果]: {tool_result}\n-----------\n'
+                            yield msg
 
-                # 將工具執行結果封裝成 ToolMessage 回傳給 LLM
-                tool_message = ToolMessage(
-                    content=str(tool_result),          # 工具執行的文字結果
-                    name=tool_call["name"],            # 工具名稱
-                    # 工具呼叫 ID（讓 LLM 知道對應哪個呼叫）
-                    tool_call_id=tool_call["id"],
-                )
-                # 將工具回傳結果加入訊息列表，提供 LLM 下一輪參考
-                self.message.append(tool_message)
+                        # 將工具執行結果封裝成 ToolMessage 回傳給 LLM
+                        tool_message = ToolMessage(
+                            content=str(tool_result),          # 工具執行的文字結果
+                            name=tool_call["name"],            # 工具名稱
+                            # 工具呼叫 ID（讓 LLM 知道對應哪個呼叫）
+                            tool_call_id=tool_call["id"],
+                        )
+                        # 將工具回傳結果加入訊息列表，提供 LLM 下一輪參考
+                        self.message.append(tool_message)
 
-            # 若這一輪沒有任何工具呼叫，表示 LLM 已經生成最終回覆
-            if not is_tools_call:
-                break
+                    # 若這一輪沒有任何工具呼叫，表示 LLM 已經生成最終回覆
+                    if not is_tools_call:
+                        break
+
+        except ChatGoogleGenerativeAIError as e:
+            # 處理 Google Gemini Token 耗盡 (429 RESOURCE_EXHAUSTED)
+            if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e):
+                yield "API額度已耗盡，請更換其他模型"
+                return
+            raise e
+        except APIConnectionError:
+            # 處理 Local LLM 連線失敗
+            yield "本地端伺服器無法連接，請更換其他模型"
+            return
 
     def chat(self, text, print_output=False):
         """
@@ -214,43 +227,39 @@ class stream_chat_bot:
 """
 選擇主要LLM
 """
-model_select = input(
-    "請選擇使用模型:(1.地端gemma3-12b / 2.免費gemini-3-flash / 3.付費gemini-3-flash)")
-if str(model_select) == "1":
-    model_name = 'gemma-3-12b-it'
 
-    base_url = 'http://192.168.0.109:1234/v1'
 
-    llm = ChatOpenAI(
-        model=model_name,
-        openai_api_key="not-needed",
-        openai_api_base=base_url
-    )
+def get_llm(model_option: str):
+    """根據前端選擇回傳對應的 LLM 實例"""
+    if "local/Gemma 3 12B" in model_option:
+        return ChatOpenAI(
+            model='gemma-3-12b-it',
+            openai_api_key="not-needed",
+            openai_api_base='http://192.168.0.109:1234/v1'
+        )
+    elif "free/Gemini 3 flash" in model_option:
+        return ChatGoogleGenerativeAI(
+            model='gemini-3-flash-preview',
+            google_api_key=os.getenv("GOOGLE_API")
+        )
+    elif "price/Gemini 3 flash" in model_option:
+        return ChatGoogleGenerativeAI(
+            model='gemini-3-flash-preview',
+            google_api_key=os.getenv("GOOGLE_API_PRICE")
+        )
+    return None
 
-elif str(model_select) == "2":
-    API_KEY = os.getenv("GOOGLE_API")
-    model_name = 'gemini-3-flash-preview'
 
-    llm = ChatGoogleGenerativeAI(
-        model=model_name,
-        google_api_key=API_KEY
-    )
+def init_bot(model_option: str):
+    llm = get_llm(model_option)
+    few_game_rag = create_few_game_rag_tool(vector_store)
+    tools = [few_game_rag]
+    return stream_chat_bot(llm, tools)
 
-elif str(model_select) == "3":
-    PRICE_API_KEY = os.getenv("GOOGLE_API_PRICE")
-    model_name = 'gemini-3-flash-preview'
-
-    llm = ChatGoogleGenerativeAI(
-        model=model_name,
-        google_api_key=PRICE_API_KEY
-    )
-
-else:
-    print("請輸入1, 2 或 3 選擇使用模型")
 
 few_game_rag = create_few_game_rag_tool(vector_store)
 tools = [few_game_rag]
-bot = stream_chat_bot(llm, tools)
+# bot = stream_chat_bot(llm, tools)
 
-for x in bot.chat_generator("半條命2的評價如何", display_data=False):
-    print(x, end='')
+# for x in bot.chat_generator("半條命2的評價如何", display_data=False):
+#     print(x, end='')

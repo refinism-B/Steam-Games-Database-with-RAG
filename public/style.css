@@ -132,3 +132,14 @@ button.cl-button:hover {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--steam-bright-blue);
 }
+
+/* 讓所有代碼塊自動換行，不再出現橫向捲軸 */
+code {
+    white-space: pre-wrap !important;
+    word-break: break-all !important;
+}
+
+/* 如果只想針對 Step 裡的內容縮小字體 */
+.cl-step-content {
+    font-size: 0.85rem !important;
+}
