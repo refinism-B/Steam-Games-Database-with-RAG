@@ -254,3 +254,24 @@ div[role="dialog"]:has(h2.text-3xl) button.absolute.right-4.top-4:hover {
 #theme-toggle:hover {
     color: #87CEEB !important;
 }
+
+/* 1. 針對模型選擇下拉選單 (id="Model") */
+#Model:focus-visible {
+    --ring: #87CEEB !important; 
+    box-shadow: 0 0 0 2px #1e1e1e, 0 0 0 4px #87CEEB !important;
+    outline: none !important;
+    border-color: #87CEEB !important; /* 同步調整邊框顏色，視覺更一致 */
+}
+
+/* 2. 針對所有通用的「X」關閉按鈕 (absolute right-4 top-4) */
+/* 這樣設定可以確保不管是說明視窗還是設定視窗的關閉鍵都變成淺藍色 */
+button.absolute.right-4.top-4:focus-visible {
+    --ring: #87CEEB !important; 
+    box-shadow: 0 0 0 2px #1e1e1e, 0 0 0 4px #87CEEB !important;
+    outline: none !important;
+}
+
+/* (選填) 讓模型選單在懸停時也有一點藍色光暈，提升質感 */
+#Model:hover {
+    border-color: #87CEEB !important;
+}
