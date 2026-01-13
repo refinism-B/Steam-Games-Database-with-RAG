@@ -157,7 +157,7 @@ while True:
             if new_game_info.get("categories"):  # 檢查是否存在且不為 None
                 for category in new_game_info["categories"]:
                     new_category_list.append(category.get("description", ""))
-            new_game_info["categories"] = ", ".join(new_category_list)
+            new_game_info["categories"] = new_category_list
 
             # 處理tags (增加安全檢查)
             new_tag_list = []
@@ -168,23 +168,14 @@ while True:
                     n += 1
                     if n >= 15:
                         break
-            new_game_info["tags"] = ", ".join(new_tag_list)
+            new_game_info["tags"] = new_tag_list
 
             # 處理genres
             new_genres_list = []
             if new_game_info.get("genres"):
                 for genres in new_game_info["genres"]:
                     new_genres_list.append(genres.get("description", ""))
-            new_game_info["genres"] = ", ".join(new_genres_list)
-
-            # 處理developers和publishers (檢查是否為 List)
-            developers = new_game_info.get("developers", [])
-            new_game_info["developers"] = ", ".join(
-                developers) if isinstance(developers, list) else ""
-
-            publishers = new_game_info.get("publishers", [])
-            new_game_info["publishers"] = ", ".join(
-                publishers) if isinstance(publishers, list) else ""
+            new_game_info["genres"] = new_genres_list
 
             # 處理price_overview (增加 None 檢查)
             price_cols = ['currency', 'initial']
@@ -223,7 +214,12 @@ while True:
                 new_game_info['metacritic_score'] = None
             new_game_info.pop('metacritic', None)
 
-            # 原程式碼此處有一行 new_game_info['metacritic_score'] 無作用，已移除
+            # 處理language
+            new_languages = new_game_info["languages"]
+            new_languages = new_languages.split(", ")
+            new_languages = [item.strip()
+                             for item in new_languages if type(item) == str]
+            new_game_info["languages"] = new_languages
 
             # 處理release_date (增加格式錯誤處理)
             release_info = new_game_info.get('release_date', {})

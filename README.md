@@ -2,66 +2,74 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![LangChain](https://img.shields.io/badge/LangChain-Integration-green)](https://www.langchain.com/)
+[![Chainlit](https://img.shields.io/badge/Chainlit-Frontend-FF69B4.svg)](https://docs.chainlit.io/)
+[![Zeabur](https://zeabur.com/button.svg)](https://steam-rag-db.zeabur.app/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**這是一個結合資料工程 (Data Engineering) 與大型語言模型 (RAG) 的 Steam 遊戲數據分析專案。**
+**這是一個結合資料工程 (Data Engineering) 與 Agentic RAG 的 Steam 遊戲數據分析專案。**
 
-本專案旨在建構一個自動化的 pipeline，從 Steam 平台採集遊戲數據，進行標準化 ETL 處理，並建立向量資料庫 (Vector Database)。最終透過檢索增強生成 (RAG) 技術，讓使用者能夠以自然語言查詢遊戲資訊、評論摘要與隱藏特徵。
+本專案建構了一個完整的自動化 Pipeline，從 Steam 平台採集遊戲數據，進行標準化 ETL 處理，並建立向量資料庫 (Vector Database)。透過 **Chainlit** 建構的互動式前端，使用者能以自然語言查詢遊戲資訊，系統後端採用 **LangChain** 架構，具備提示詞優化、歷史摘要與 RAG 工具調用功能。
+
+🌟 **線上體驗 (Live Demo)**: [https://steam-rag-db.zeabur.app/](https://steam-rag-db.zeabur.app/)
 
 ---
 
 ## ✨ 核心功能 (Key Features)
 
--   **自動化爬蟲系統**: 支援多執行緒背景採集 Steam 遊戲 ID、詳細資訊、使用者評論與標籤。
--   **ETL 資料管線**:
-    -   **清洗**: 自動去除 HTML 標籤、標準化價格與日期格式。
-    -   **特徵工程**: 攤平硬體需求巢狀結構，計算評價指標。
-    -   **結構化**: 將異質資料轉換為適合 RAG 檢索的 Document 格式。
--   **RAG 檢索增強生成**:
-    -   **Hybrid Retrieval**: 採用 Parent-Document Retriever 策略，兼顧檢索精準度 (Child Chunk) 與上下文完整性 (Parent Chunk)。
-    -   **Cloud Integration**:
-        -   **Vector DB**: 使用 **Cloud PostgreSQL (pgvector)** 儲存與檢索高維向量。
-        -   **Embedding**: 介接 **Cloud Ollama** 服務進行高效文本向量化。
-    -   **Flexible LLM**: 支援 Google Gemini (Cloud) 與 LM Studio (Local) 切換。
--   **Flask API**: 提供 RESTful API 介面，可遠端觸發背景爬蟲任務。
+### 🚀 現代化前端 (Frontend)
+- **Interactive UI**: 使用 **Chainlit** 打造對話式介面，體驗流暢。
+- **Model Switching**: 使用者可於介面切換不同模型：
+    - `price/Gemini 3 flash` (完整體驗推薦)
+    - `free/Gemini 3 flash`
+    - `local/Gemma 3 12B` (需搭配本地伺服器)
+- **Transparent Logic**: 可選擇是否展開 **RAG 思考過程**，即時查看「工具調用參數」與「檢索回傳資料」。
+
+### 🧠 智慧後端 (Intelligent Backend)
+- **LangChain Agent**: 採用 Tool Use 架構，根據問題自動判斷是否需要檢索 Steam 資料庫。
+- **Prompt Engineering**:
+    - **Query Rewriting**: 中間層 LLM 自動將口語提問重寫為精準的獨立查詢語句，補全上下文代名詞。
+    - **History Summarization**: 當對話過長 (>3 輪) 時自動觸發摘要機制，壓縮歷史訊息以維持長期記憶並節省 Token。
+- **RAG Architecture**:
+    - **Hybrid Retrieval**: 採用 Parent-Document Retriever 策略，兼顧檢索精準度 (Child Chunk) 與上下文完整性 (Parent Chunk)。
+    - **Cloud Integration**: 使用 **Cloud PostgreSQL (pgvector)** 與 **Cloud Ollama** 實現雲端向量存儲與計算。
+
+### 🛠️ 自動化工程 (Data Engineering)
+- **Data Ingestion**: 多執行緒爬蟲採集 Steam Info, Reviews, Tags。
+- **ETL Pipeline**: 自動清洗 HTML、標準化格式、攤平巢狀結構，並轉換為 RAG 專用 Document 格式。
 
 ---
 
 ## 🏗️ 系統架構 (Architecture)
 
-本專案採用模組化設計，包含資料擷取、ETL 處理、向量化與 RAG 應用四個主要階段。
-
 ```mermaid
 graph TD
-    subgraph Data_Ingestion ["1. Data Ingestion"]
-        API[Flask API] -->|Trigger| Crawler[Multi-threaded Crawler]
-        Crawler -->|Fetch| SteamAPI[Steam Web API]
-        SteamAPI -->|Response| RawData["Raw JSON Data<br/>(Info, Review, Tag)"]
+    subgraph Frontend [Frontend Interface]
+        User([User]) <--> Chainlit[Chainlit App<br/>(Zeabur Trigger)]
+        Chainlit -->|Config| Settings[Model & RAG Switch]
     end
 
-    subgraph ETL_Process [2. ETL Process]
-        RawData --> Clean[ETL_json.py<br/>Clean & Merge]
-        Clean --> ProcessedJSON[Processed JSON]
-        ProcessedJSON --> Struct[ETL_document.py<br/>Document Structuring]
-        Struct --> Docs["Document Objects<br/>(Context + Metadata)"]
+    subgraph Backend_Agent [Agentic RAG Core]
+        Chainlit --> Agent[LangChain Agent]
+        Agent --> Rewrite[Query Rewriter]
+        Agent --> Summarize[History Summarizer]
+        Agent <-->|Tool Call| RAG_Tool[Game DB Retrieval]
+        Agent -->|Generate| LLM["LLM Service<br/>(Gemini / Local Gemma)"]
     end
 
-    subgraph RAG_System [3. RAG & Vector Config]
-        Docs --> Split[Parent-Child Splitter]
-        Split --> Embed["Embedding Model<br/>(Cloud Ollama)"]
+    subgraph Data_Pipe [Data Pipeline]
+        Crawler[Crawler Scripts] -->|Fetch| SteamAPI[Steam Web API]
+        SteamAPI --> RawData[Raw JSON]
+        RawData --> ETL[ETL Process]
+        ETL --> Docs[Documents]
+    end
+
+    subgraph Vector_System [Cloud Infrastructure]
+        Docs --> Embed[Embedding Model<br/>(Cloud Ollama)]
         Embed --> VectorDB[(Vector DB<br/>Cloud PostgreSQL)]
+        RAG_Tool <-->|Retrieve| VectorDB
     end
 
-    subgraph Application [4. Application Layer]
-        Query[User Query] -->|Ask| Agent[LangChain Agent]
-        Agent <-->|Retrieve| VectorDB
-        Agent -->|Generate| LLM["LLM<br/>(Gemini / Local)"]
-        LLM --> Answer[Final Answer]
-    end
-
-    Data_Ingestion --> ETL_Process
-    ETL_Process --> RAG_System
-    RAG_System --> Application
+    Data_Pipe --> Vector_System
 ```
 
 ---
@@ -72,19 +80,19 @@ graph TD
 
 ```text
 Steam-Games-Database-with-RAG/
-├── app.py                 # Flask 應用程式入口 (API Server)
-├── data/                  # 資料儲存區 (Raw, Processed)
-├── docs/                  # 專案文件
-├── notebooks/             # 實驗與測試用的 Jupyter Notebooks
+├── app.py                 # Chainlit 應用程式入口
+├── chainlit.md            # Chainlit 歡迎頁面設定
 ├── src/                   # 核心原始碼
-│   ├── crawler/           # 爬蟲模組 (GameID, Info, Review, Tag)
-│   ├── ETL/               # 資料清洗與轉換腳本
-│   ├── embedding/         # 文本向量化邏輯 (Cloud Ollama)
-│   ├── llm/               # RAG Agent 與 LLM 串接
-│   ├── database/          # 資料庫連線模組 (PostgreSQL)
-│   └── utils/             # 通用工具
-├── requirements.txt       # Python 依賴清單
-└── .env                   # 環境變數設定 (API Keys, DB Config)
+│   ├── llm/               # Agent 邏輯 (Prompt rewriting, Summarization)
+│   ├── rag/               # RAG Tools 定義
+│   ├── embedding/         # 向量化服務串接
+│   ├── crawler/           # 資料採集腳本
+│   ├── ETL/               # 資料清洗轉換
+│   └── database/          # PostgreSQL 連線設定
+├── data/                  # 本地資料暫存 (Git ignored)
+├── docs/                  # 專案文件
+├── notebooks/             # 實驗性 Notebooks
+└── .env                   # 環境變數設定
 ```
 
 ---
@@ -93,32 +101,22 @@ Steam-Games-Database-with-RAG/
 
 ### 1. 環境準備
 
-確保您的系統已安裝 Python 3.10+，並建議使用虛擬環境。
+確保您的系統已安裝 Python 3.10+。
 
 ```bash
-# Clone 專案
 git clone https://github.com/your-username/Steam-Games-Database-with-RAG.git
 cd Steam-Games-Database-with-RAG
-
-# 建立虛擬環境 (Optional)
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# 安裝依賴
 pip install -r requirements.txt
 ```
 
 ### 2. 設定環境變數
 
-在專案根目錄建立 `.env` 檔案，填入 Database 連線資訊與 API Key：
+在專案根目錄建立 `.env` 檔案：
 
 ```ini
-# .env
+# .env Example
 
-# Steam API
-STEAM_API_KEY=your_steam_api_key
-
-# Database Config (Cloud PostgreSQL)
+# Database (Cloud PostgreSQL)
 PG_HOST=your_db_host
 PG_DATABASE=your_db_name
 PG_USERNAME=your_db_user
@@ -126,51 +124,34 @@ PG_PASSWORD=your_db_password
 PG_PORT=5432
 PG_COLLECTION=steam_games_DB
 
-# Embedding Service (Cloud Ollama)
+# Embedding (Cloud Ollama)
 OLLAMA_URL=https://your-ollama-service-url
 EMBEDDING_MODEL=bge-m3
 
-# LLM Provider
-GOOGLE_API=your_google_gemini_key  # 若使用 Gemini
-# OLLAMA_LOCAL=http://localhost:11434 # 若使用 Local Ollama
+# LLM Keys
+GOOGLE_API=your_gemini_api_key        # Default
+GOOGLE_API_PRICE=your_paid_api_key    # Optional
 ```
 
-### 3. 啟動爬蟲服務
+### 3. 啟動應用程式
 
-執行 Flask App 以啟動 API Server：
+使用 Chainlit 啟動前端介面：
 
 ```bash
-python app.py
+chainlit run app.py -w
 ```
-
-伺服器啟動後 (預設 Port 8080)，可透過瀏覽器或 Postman 觸發爬蟲：
--   **取得遊戲詳細資訊**: `http://localhost:8080/run/info`
--   **取得遊戲評論**: `http://localhost:8080/run/review`
--   **取得遊戲標籤**: `http://localhost:8080/run/tag`
-
-> [!TIP]
-> **建議雲端部署 (Cloud Deployment Recommended)**
-> 由於 Steam 遊戲資料量龐大 (約 150,000 筆)，完整爬取極為耗時。建議將本專案部署至雲端平台 (如 Zeabur, AWS, GCP)，並透過 `app.py` 提供的 API 介面在背景觸發爬蟲任務。
-
-### 4. 執行 ETL 與 RAG 流程
-
-目前 ETL 與 RAG 功能建議透過 Jupyter Notebook 進行互動式操作與驗證：
-
--   **資料清洗**: 執行 `notebooks/ETL_json.ipynb`
--   **建立向量庫**: 執行 `notebooks/text_embedding.ipynb` (將調用 Cloud Ollama 與 PostgreSQL)
--   **RAG 對話測試**: 執行 `notebooks/llm.ipynb`
+瀏覽器將自動開啟 `http://localhost:8000`。
 
 ---
 
 ## 🗓️ 開發藍圖 (Roadmap)
 
-- [x] **資料擷取**: 實作 Steam 基礎資訊、評論與標籤爬蟲。
-- [x] **基礎 ETL**: 完成 JSON 清洗、攤平與結構化轉換。
-- [x] **RAG 原型**: 建立基於 Parent-Document 的檢索系統。
-- [x] **資料庫優化**: 導入 Cloud PostgreSQL (pgvector) 支援高效向量檢索。
-- [x] **模型服務化**: 介接 Cloud Ollama 作為 Embedding 服務端點。
-- [ ] **雲端部署**: 容器化應用並部署至 Zeabur/GCP。
-- [ ] **GUI 介面**: 開發 Streamlit 或 Gradio 介面，提供友善的對話視窗。
+- [x] **資料工程**: 完成 Steam 爬蟲、ETL 流程與 PostgreSQL 向量庫建置。
+- [x] **RAG 系統**: 實作 Parent-Document Retrieval 與 LangChain Agent。
+- [x] **前端介面**: 整合 Chainlit 提供對話式 Web UI。
+- [x] **雲端部署**: 成功部署至 Zeabur 平台。
+- [ ] **多工具擴展**: 增加更多查詢工具（如：價格歷史比對、類似遊戲推薦）。
+- [ ] **多模態支援**: 未來計畫加入遊戲截圖或影片的分析能力。
 
 ---
 
