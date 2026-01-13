@@ -25,6 +25,7 @@ langchain-text-splitters==1.1.0
 sqlalchemy==2.0.45
 psycopg2-binary==2.9.11
 pgvector==0.3.6
+langchain-postgres==0.0.16
 
 # --- 監控與追蹤 (OpenTelemetry) ---
 traceloop-sdk==0.50.1
