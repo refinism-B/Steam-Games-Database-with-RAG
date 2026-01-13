@@ -100,6 +100,9 @@ class stream_chat_bot:
         self.llm = llm
         # 初始化對話機器人，傳入 LLM 與可用工具列表
         self.tools = tools
+        # 建立工具名稱對應表，用於後續動態呼叫
+        self.tool_map = {tool.name: tool for tool in tools}
+        
         # 將 LLM 綁定（bind）工具，使其具備自動呼叫工具的能力
         self.llm_with_tools = llm.bind_tools(tools)
 
@@ -209,8 +212,10 @@ class stream_chat_bot:
                         yield msg  # 使用 yield 讓結果能即時顯示在輸出中
 
                     # 實際執行工具（根據工具名稱動態呼叫對應物件）
-                    tool_result = globals()[tool_call['name']].invoke(
-                        tool_call['args'])
+                    if tool_call['name'] in self.tool_map:
+                         tool_result = self.tool_map[tool_call['name']].invoke(tool_call['args'])
+                    else:
+                         tool_result = f"Error: Tool '{tool_call['name']}' not found."
 
                     if display_data:
                         # # 顯示工具執行結果
