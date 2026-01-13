@@ -76,7 +76,7 @@
 graph TD
     subgraph Frontend [Frontend Interface]
         User([User]) <--> Chainlit["Chainlit App<br/>(Zeabur Trigger)"]
-        Chainlit -->|Config| Settings[Model & RAG Switch]
+        Chainlit -->|Config| Settings["Model & RAG Switch"]
     end
 
     subgraph Backend_Agent [Agentic RAG Core]
@@ -95,8 +95,8 @@ graph TD
     end
 
     subgraph Vector_System [Cloud Infrastructure]
-        Docs --> Embed[Embedding Model<br/>(Cloud Ollama)]
-        Embed --> VectorDB[(Vector DB<br/>Cloud PostgreSQL)]
+        Docs --> Embed["Embedding Model<br/>(Cloud Ollama)"]
+        Embed --> VectorDB[("Vector DB<br/>Cloud PostgreSQL")]
         RAG_Tool <-->|Retrieve| VectorDB
     end
 
