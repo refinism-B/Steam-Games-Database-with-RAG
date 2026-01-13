@@ -152,51 +152,51 @@ class stream_chat_bot:
             self.message.append(HumanMessage(refined_text))
 
             while True:
-                    # 呼叫 LLM，傳入完整訊息歷史
-                    final_ai_message = AIMessageChunk(content="")
-                    for chunk in self.llm_with_tools.stream(self.message):
-                        final_ai_message += chunk
-                        if hasattr(chunk, 'content') and chunk.content:
-                            yield self.str_parser.invoke(chunk)
+                # 呼叫 LLM，傳入完整訊息歷史
+                final_ai_message = AIMessageChunk(content="")
+                for chunk in self.llm_with_tools.stream(self.message):
+                    final_ai_message += chunk
+                    if hasattr(chunk, 'content') and chunk.content:
+                        yield self.str_parser.invoke(chunk)
 
-                    response = final_ai_message
+                response = final_ai_message
 
-                    # 將 LLM 回應加入訊息列表
-                    self.message.append(response)
+                # 將 LLM 回應加入訊息列表
+                self.message.append(response)
 
-                    # 檢查 LLM 是否要求呼叫工具
-                    is_tools_call = False
-                    for tool_call in response.tool_calls:
-                        is_tools_call = True
+                # 檢查 LLM 是否要求呼叫工具
+                is_tools_call = False
+                for tool_call in response.tool_calls:
+                    is_tools_call = True
 
-                        if display_data:
-                            # # 顯示 LLM 要執行的工具名稱與參數
-                            # 完整訊息
-                            msg = f'[執行]: {tool_call["name"]}({tool_call["args"]})\n-----------\n'
-                            yield msg  # 使用 yield 讓結果能即時顯示在輸出中
+                    if display_data:
+                        # # 顯示 LLM 要執行的工具名稱與參數
+                        # 完整訊息
+                        msg = f'[執行]: {tool_call["name"]}({tool_call["args"]})\n-----------\n'
+                        yield msg  # 使用 yield 讓結果能即時顯示在輸出中
 
-                        # 實際執行工具（根據工具名稱動態呼叫對應物件）
-                        tool_result = globals()[tool_call['name']].invoke(
-                            tool_call['args'])
+                    # 實際執行工具（根據工具名稱動態呼叫對應物件）
+                    tool_result = globals()[tool_call['name']].invoke(
+                        tool_call['args'])
 
-                        if display_data:
-                            # # 顯示工具執行結果
-                            msg = f'[結果]: {tool_result}\n-----------\n'
-                            yield msg
+                    if display_data:
+                        # # 顯示工具執行結果
+                        msg = f'[結果]: {tool_result}\n-----------\n'
+                        yield msg
 
-                        # 將工具執行結果封裝成 ToolMessage 回傳給 LLM
-                        tool_message = ToolMessage(
-                            content=str(tool_result),          # 工具執行的文字結果
-                            name=tool_call["name"],            # 工具名稱
-                            # 工具呼叫 ID（讓 LLM 知道對應哪個呼叫）
-                            tool_call_id=tool_call["id"],
-                        )
-                        # 將工具回傳結果加入訊息列表，提供 LLM 下一輪參考
-                        self.message.append(tool_message)
+                    # 將工具執行結果封裝成 ToolMessage 回傳給 LLM
+                    tool_message = ToolMessage(
+                        content=str(tool_result),          # 工具執行的文字結果
+                        name=tool_call["name"],            # 工具名稱
+                        # 工具呼叫 ID（讓 LLM 知道對應哪個呼叫）
+                        tool_call_id=tool_call["id"],
+                    )
+                    # 將工具回傳結果加入訊息列表，提供 LLM 下一輪參考
+                    self.message.append(tool_message)
 
-                    # 若這一輪沒有任何工具呼叫，表示 LLM 已經生成最終回覆
-                    if not is_tools_call:
-                        break
+                # 若這一輪沒有任何工具呼叫，表示 LLM 已經生成最終回覆
+                if not is_tools_call:
+                    break
 
         except ChatGoogleGenerativeAIError as e:
             # 處理 Google Gemini Token 耗盡 (429 RESOURCE_EXHAUSTED)

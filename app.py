@@ -48,7 +48,7 @@ async def setup_agent(settings):
     try:
         new_bot = init_bot(settings["Model"])
         cl.user_session.set("bot", new_bot)
-        await cl.Message(content=f"✅ 系統設定已更新：目前切換至 {settings['Model']}").send()
+        # await cl.Message(content=f"✅ 系統設定已更新：目前切換至 {settings['Model']}").send()
     except Exception as e:
         cl.user_session.set("bot", None)
         await cl.Message(
@@ -61,14 +61,14 @@ async def main(message: cl.Message):
     # 1. 取得 Session 中的 bot 與設定
     bot = cl.user_session.get("bot")
     settings = cl.user_session.get("settings")
-    
+
     # 檢查 bot 是否成功初始化
     if bot is None:
         await cl.Message(
             content="⚠️ **Bot 尚未初始化**\n\n請檢查系統設定或重新整理頁面。若問題持續，請聯繫管理員。"
         ).send()
         return
-    
+
     should_show_rag = settings["Show_RAG"]
 
     # 2. 建立一個空的訊息容器用於串流輸出
@@ -101,8 +101,7 @@ async def main(message: cl.Message):
             await msg.stream_token(chunk)
     except Exception as e:
         if not msg.content:
-             await msg.send()
+            await msg.send()
         await msg.stream_token(f"\n\n\n⚠️ **系統發生錯誤**：{str(e)}")
-
 
     await msg.update()

@@ -20,17 +20,21 @@ Steam-Games-Database-with-RAG/
 │   ├── ETL/               # ETL 流程：清洗、標準化、特徵工程
 │   │   ├── ETL_document.py
 │   │   └── ETL_json.py
-│   ├── llm/               # (預留) RAG 核心模組，目前邏輯位於 notebooks/llm.ipynb
+│   ├── llm/               # Agentic RAG 核心模組 (ChatBot, Memory, Prompt Rewriting)
+│   │   └── llm.py
+│   ├── rag/               # RAG 工具模組 (LangChain Tools)
+│   │   └── tools.py
 │   └── utils/             # 通用工具函式
 │       └── scraper_base.py
 ├── notebooks/             # 實驗與核心邏輯驗證 (RAG/EDA)
 │   ├── crawler.ipynb
 │   ├── ETL_document.ipynb
 │   ├── ETL_json.ipynb
-│   ├── llm.ipynb          # RAG 檢索與對話流程核心代碼 (待遷移至 src/llm)
+│   ├── llm.ipynb
 │   ├── reviews_crawl.ipynb
 │   └── text_embedding.ipynb
-├── app.py                 # 背景爬蟲觸發 API (Flask)
+├── app.py                 # Chainlit 前端對話介面
+├── chainlit.md            # Chainlit 歡迎頁面設定
 ├── requirements.txt       # 套件清單
 ├── .env                   # 環境變數 (存放 Database, API Keys)
 └── README.md              # 專案說明文件
