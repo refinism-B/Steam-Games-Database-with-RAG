@@ -1,6 +1,6 @@
 # Steam Games Database with RAG 🎮
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.13-blue.svg)](https://www.python.org/)
 [![LangChain](https://img.shields.io/badge/LangChain-Integration-green)](https://www.langchain.com/)
 [![Chainlit](https://img.shields.io/badge/Chainlit-Frontend-FF69B4.svg)](https://docs.chainlit.io/)
 [![Zeabur](https://zeabur.com/button.svg)](https://steam-rag-db.zeabur.app/)
@@ -33,9 +33,40 @@
     - **Hybrid Retrieval**: 採用 Parent-Document Retriever 策略，兼顧檢索精準度 (Child Chunk) 與上下文完整性 (Parent Chunk)。
     - **Cloud Integration**: 使用 **Cloud PostgreSQL (pgvector)** 與 **Cloud Ollama** 實現雲端向量存儲與計算。
 
-### 🛠️ 自動化工程 (Data Engineering)
+### 🛠️ 資料工程 (Data Engineering)
 - **Data Ingestion**: 多執行緒爬蟲採集 Steam Info, Reviews, Tags。
 - **ETL Pipeline**: 自動清洗 HTML、標準化格式、攤平巢狀結構，並轉換為 RAG 專用 Document 格式。
+
+---
+
+## 📥 資料擷取 (Data Ingestion)
+
+本專案採用客製化爬蟲策略，確保資料的完整性與即時性。主要腳本位於 `src/crawler/`：
+
+1. **ID 列表獲取 (`SteamGameID.py`)**：
+    - 直接介接 Steam Web API，獲取全平台遊戲 AppID。
+    - 實作自動重試與 Checkpoint 機制，支援中斷續爬。
+2. **多維度資料採集**：
+    - **基本資訊 (`SteamInfo.py`)**：擷取遊戲名稱、發行日、價格、開發商等 Metadata。
+    - **評論數據 (`SteamReview.py`)**：採集使用者真實評論，作為質化分析依據。
+    - **遊戲標籤 (`SteamTag.py`)**：獲取 Steam 定義的遊戲標籤 (Genres/Categories)。
+3. **儲存策略**：原始資料以 JSON 格式分批存儲於 `data/raw/`，確保原始數據 (Raw Data) 的不可變性 (Immutability)。
+
+## 🔄 資料處理 (Data Processing)
+
+資料處理流程確保數據從原始格式轉換為適合 RAG 檢索的高品質文檔。主要邏輯位於 `src/ETL/`：
+
+1. **資料清洗與標準化 (Cleaning & Normalization)**：
+    - `ETL_json.py` 負責將 Info, Review, Tag 三方資料源依據 `appid` 進行合併。
+    - **HTML 清洗**：使用 `BeautifulSoup` 去除描述欄位中的冗餘 HTML 標籤。
+    - **結構攤平**：將硬體需求 (System Requirements) 等巢狀 JSON 結構攤平為關聯式欄位。
+2. **特徵工程 (Feature Engineering)**：
+    - 計算好評率 (Positive Rate) 與價格標準化。
+    - 提取關鍵 Metadata (如 `genres`, `tags`) 供後續 Hybrid Search 使用。
+3. **文件結構化 (Document Structuring)**：
+    - `ETL_document.py` 將清洗後的資料轉換為 LangChain `Document` 物件。
+    - **Context 設計**：將 `detailed_description` 與 `short_description` 組合為語義檢索的主體內容。
+    - **Metadata 注入**：保留 `price`, `release_date`, `appid` 等欄位，支援 RAG 的結構化過濾 (Post-filtering)。
 
 ---
 
@@ -44,7 +75,7 @@
 ```mermaid
 graph TD
     subgraph Frontend [Frontend Interface]
-        User([User]) <--> Chainlit[Chainlit App<br/>(Zeabur Trigger)]
+        User([User]) <--> Chainlit["Chainlit App<br/>(Zeabur Trigger)"]
         Chainlit -->|Config| Settings[Model & RAG Switch]
     end
 
@@ -101,7 +132,7 @@ Steam-Games-Database-with-RAG/
 
 ### 1. 環境準備
 
-確保您的系統已安裝 Python 3.10+。
+確保您的系統已安裝 Python 3.13 (建議 3.13.0 以上，3.14 以下)。
 
 ```bash
 git clone https://github.com/your-username/Steam-Games-Database-with-RAG.git
