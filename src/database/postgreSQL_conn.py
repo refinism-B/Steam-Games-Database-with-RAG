@@ -10,24 +10,24 @@ from psycopg2.extras import execute_values
 
 load_dotenv()
 
-YOUR_PG_HOST = os.environ.get("PG_HOST")
-YOUR_DB_NAME = os.environ.get("PG_DATABASE")
-YOUR_USER = os.environ.get("PG_USERNAME")
-YOUR_PASSWORD = os.environ.get("PG_PASSWORD")
-YOUR_PORT = os.environ.get("PG_PORT")
+PG_HOST = os.environ.get("PG_HOST")
+DB_NAME = os.environ.get("PG_DATABASE")
+USER = os.environ.get("PG_USERNAME")
+PASSWORD = os.environ.get("PG_PASSWORD")
+PORT = os.environ.get("PG_PORT")
 OLLAMA_URL = os.environ.get("OLLAMA_URL")
 
 
 def connect_to_pgSQL():
     DB_CONFIG = {
-        "host": YOUR_PG_HOST,
-        "database": YOUR_DB_NAME,
-        "user": YOUR_USER,
-        "password": YOUR_PASSWORD,
-        "port": YOUR_PORT
+        "host": PG_HOST,
+        "database": DB_NAME,
+        "user": USER,
+        "password": PASSWORD,
+        "port": PORT
     }
 
-    pg_url = f"postgresql+psycopg2://{DB_CONFIG["user"]}:{DB_CONFIG["password"]}@{DB_CONFIG["host"]}:{DB_CONFIG["port"]}/{DB_CONFIG["database"]}"
+    pg_url = f"postgresql+psycopg2://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
     return pg_url
 
 

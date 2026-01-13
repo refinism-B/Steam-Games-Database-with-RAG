@@ -1,0 +1,145 @@
+/* public/style.css */
+
+/* 1. 變數層級：強制定義全域主題色 */
+/* Chainlit 很多元件是直接讀取變數的，這是最底層的改法 */
+:root {
+  --primary: 202 86% 68% !important; /* Steam Blue */
+  --primary-foreground: 222 18% 11% !important;
+}
+
+/* 2. 已確認生效的訊息樣式 (保持優化) */
+.cl-user-message {
+  background-color: #2a475e !important;
+  color: #ffffff !important;
+}
+.cl-assistant-message {
+  background-color: #1b2838 !important;
+  border: 1px solid #3d4d5d !important;
+}
+
+/* 3. 針對「送出按鈕」的精確圍堵 */
+/* 我們利用按鈕上的 Tailwind Class 作為選取器，並加上 !important */
+
+/* 針對背景顏色 */
+button.bg-primary, 
+.cl-input-container button {
+  background-color: rgb(102, 192, 244) !important;
+  color: #171a21 !important;
+}
+
+/* 針對按鈕內的 SVG 圖標顏色 (currentColor) */
+button.bg-primary svg,
+.cl-input-container button svg {
+  color: #171a21 !important;
+  fill: #171a21 !important;
+}
+
+/* 4. 滑鼠懸停效果 (Hover) */
+button.bg-primary:hover {
+  background-color: #7fd2ff !important;
+  box-shadow: 0 0 15px rgba(102, 192, 244, 0.6) !important;
+  transform: scale(1.05);
+}
+
+/* 5. 消除輸入框聚焦時可能出現的粉紅色邊框 */
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: #66c0f4 !important;
+}
+
+/* 6. 輸入框整體的 Steam 風格 */
+.cl-input-container {
+  background-color: #1b2838 !important;
+  border-top: 2px solid #66c0f4 !important;
+}
+
+
+/* Steam 主題配色與圓角化 */
+
+:root {
+    /* Steam 經典配色 */
+    --steam-dark-blue: #171a21;      /* 最深色背景 */
+    --steam-panel-blue: #1b2838;     /* 區塊/側邊欄背景 */
+    --steam-bright-blue: #66c0f4;    /* 強調色/按鈕藍 */
+    --steam-hover-blue: #2a475e;     /* 滑鼠懸停色 */
+    --steam-text-grey: #c7d5e0;      /* 主要文字色 */
+    --steam-border-radius: 12px;     /* 全域圓角設定 */
+}
+
+/* 1. 整體背景設定 */
+body, #root {
+    background-color: var(--steam-dark-blue) !important;
+    color: var(--steam-text-grey) !important;
+}
+
+/* 2. 側邊欄與主要容器 */
+.cl-sidebar, .cl-container {
+    background-color: var(--steam-panel-blue) !important;
+    border-radius: var(--steam-border-radius);
+    margin: 10px;
+}
+
+/* 3. 對話訊息框圓角化 */
+.cl-message-content {
+    background-color: var(--steam-hover-blue) !important;
+    border-radius: 16px !important; /* 讓訊息泡泡更圓潤 */
+    padding: 12px 18px !important;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* 4. 輸入框區塊 (Input Bar) */
+#step-input-container {
+    background-color: var(--steam-panel-blue) !important;
+    border: 2px solid var(--steam-hover-blue) !important;
+    border-radius: 25px !important; /* 橢圓形輸入框 */
+    padding: 5px 15px !important;
+    margin-bottom: 20px;
+}
+
+#step-input {
+    color: white !important;
+}
+
+/* 5. 按鈕 (Buttons) 圓角與 Steam 藍 */
+button.cl-button {
+    background-color: var(--steam-bright-blue) !important;
+    color: #fff !important;
+    border-radius: 20px !important; /* 按鈕圓角化 */
+    text-transform: uppercase;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+button.cl-button:hover {
+    background-color: #ffffff !important;
+    color: var(--steam-dark-blue) !important;
+    box-shadow: 0 0 10px var(--steam-bright-blue);
+}
+
+/* 6. 捲軸美化 (Scrollbar) */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--steam-dark-blue);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--steam-hover-blue);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--steam-bright-blue);
+}
+
+/* 讓所有代碼塊自動換行，不再出現橫向捲軸 */
+code {
+    white-space: pre-wrap !important;
+    word-break: break-all !important;
+}
+
+/* 如果只想針對 Step 裡的內容縮小字體 */
+.cl-step-content {
+    font-size: 0.85rem !important;
+}
