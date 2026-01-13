@@ -2,20 +2,20 @@
 
 /* 1. 變數層級：強制定義全域主題色 */
 /* Chainlit 很多元件是直接讀取變數的，這是最底層的改法 */
-:root {
-  --primary: 202 86% 68% !important; /* Steam Blue */
+/* :root {
+  --primary: 202 86% 68% !important;
   --primary-foreground: 222 18% 11% !important;
-}
+} */
 
 /* 2. 已確認生效的訊息樣式 (保持優化) */
-.cl-user-message {
+/* .cl-user-message {
   background-color: #2a475e !important;
   color: #ffffff !important;
 }
 .cl-assistant-message {
   background-color: #1b2838 !important;
   border: 1px solid #3d4d5d !important;
-}
+} */
 
 /* 3. 針對「送出按鈕」的精確圍堵 */
 /* 我們利用按鈕上的 Tailwind Class 作為選取器，並加上 !important */
@@ -23,8 +23,8 @@
 /* 針對背景顏色 */
 button.bg-primary, 
 .cl-input-container button {
-  background-color: rgb(102, 192, 244) !important;
-  color: #171a21 !important;
+  background-color: rgb(82, 142, 194) !important;
+  color: #ffffff !important;
 }
 
 /* 針對按鈕內的 SVG 圖標顏色 (currentColor) */
@@ -35,11 +35,11 @@ button.bg-primary svg,
 }
 
 /* 4. 滑鼠懸停效果 (Hover) */
-button.bg-primary:hover {
+/* button.bg-primary:hover {
   background-color: #7fd2ff !important;
   box-shadow: 0 0 15px rgba(102, 192, 244, 0.6) !important;
   transform: scale(1.05);
-}
+} */
 
 /* 5. 消除輸入框聚焦時可能出現的粉紅色邊框 */
 .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
@@ -47,22 +47,21 @@ button.bg-primary:hover {
 }
 
 /* 6. 輸入框整體的 Steam 風格 */
-.cl-input-container {
+/* .cl-input-container {
   background-color: #1b2838 !important;
   border-top: 2px solid #66c0f4 !important;
-}
+} */
 
 
 /* Steam 主題配色與圓角化 */
 
 :root {
-    /* Steam 經典配色 */
-    --steam-dark-blue: #171a21;      /* 最深色背景 */
-    --steam-panel-blue: #1b2838;     /* 區塊/側邊欄背景 */
-    --steam-bright-blue: #66c0f4;    /* 強調色/按鈕藍 */
-    --steam-hover-blue: #2a475e;     /* 滑鼠懸停色 */
-    --steam-text-grey: #c7d5e0;      /* 主要文字色 */
-    --steam-border-radius: 12px;     /* 全域圓角設定 */
+    --steam-dark-blue: #171a21;
+    --steam-panel-blue: #1b2838;
+    --steam-bright-blue: #66c0f4;
+    --steam-hover-blue: #2a475e;
+    --steam-text-grey: #c7d5e0;
+    --steam-border-radius: 12px;
 }
 
 /* 1. 整體背景設定 */
@@ -72,48 +71,48 @@ body, #root {
 }
 
 /* 2. 側邊欄與主要容器 */
-.cl-sidebar, .cl-container {
+/* .cl-sidebar, .cl-container {
     background-color: var(--steam-panel-blue) !important;
     border-radius: var(--steam-border-radius);
     margin: 10px;
-}
+} */
 
 /* 3. 對話訊息框圓角化 */
-.cl-message-content {
+/* .cl-message-content {
     background-color: var(--steam-hover-blue) !important;
-    border-radius: 16px !important; /* 讓訊息泡泡更圓潤 */
+    border-radius: 16px !important;
     padding: 12px 18px !important;
     border: 1px solid rgba(255, 255, 255, 0.05);
-}
+} */
 
 /* 4. 輸入框區塊 (Input Bar) */
-#step-input-container {
+/* #step-input-container {
     background-color: var(--steam-panel-blue) !important;
     border: 2px solid var(--steam-hover-blue) !important;
-    border-radius: 25px !important; /* 橢圓形輸入框 */
+    border-radius: 25px !important;
     padding: 5px 15px !important;
     margin-bottom: 20px;
-}
+} */
 
-#step-input {
+/* #step-input {
     color: white !important;
-}
+} */
 
-/* 5. 按鈕 (Buttons) 圓角與 Steam 藍 */
-button.cl-button {
+/* 5. 按鈕 (Buttons) 圓角與 Steam 藍 ***/
+/* button.cl-button {
     background-color: var(--steam-bright-blue) !important;
     color: #fff !important;
-    border-radius: 20px !important; /* 按鈕圓角化 */
+    border-radius: 20px !important;
     text-transform: uppercase;
     font-weight: bold;
     transition: all 0.3s ease;
-}
+} */
 
-button.cl-button:hover {
+/* button.cl-button:hover {
     background-color: #ffffff !important;
     color: var(--steam-dark-blue) !important;
     box-shadow: 0 0 10px var(--steam-bright-blue);
-}
+} */
 
 /* 6. 捲軸美化 (Scrollbar) */
 ::-webkit-scrollbar {
@@ -142,4 +141,116 @@ code {
 /* 如果只想針對 Step 裡的內容縮小字體 */
 .cl-step-content {
     font-size: 0.85rem !important;
+}
+
+
+/* 定位最外層的對話框容器 */
+div[role="dialog"]:has(h2.text-3xl) {
+    /* 覆寫全螢幕設定 */
+    width: 80% !important; 
+    height: 80% !important;
+    max-width: 900px !important;
+    max-height: 85% !important; /* 稍微留點空間給底部 */
+    
+    /* 視覺效果與圓角 */
+    border-radius: 20px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+    
+    /* 強制置中 */
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    
+    /* 確保內容不會溢出圓角 */
+    overflow: hidden !important; 
+}
+
+/* 定位內層控制最大寬度的容器 */
+div[role="dialog"] .mx-auto.flex-grow {
+    max-width: 95% !important; 
+}
+
+/* 針對您提供的 HTML 結構進行隱藏 */
+div[role="dialog"]:has(h2.text-3xl) .flex.flex-col.space-y-1\.5 {
+    display: none !important;
+}
+
+/* 3. 調整內容與邊界的四邊內距 (Padding) */
+div[role="dialog"]:has(h2.text-3xl) .mx-auto.flex.flex-col.flex-grow.gap-6 {
+    padding-top: 40px !important;    /* 上 */
+    padding-right: 40px !important;  /* 右 */
+    padding-bottom: 25px !important; /* 下 */
+    padding-left: 40px !important;   /* 左 */
+    
+    max-width: 100% !important; /* 讓內容充滿調整後的視窗寬度 */
+}
+
+/* 4. 按百分比縮放文字大小 */
+div[role="dialog"]:has(h2.text-3xl) .prose {
+    font-size: 95% !important; /* 您可以自由調整此百分比 */
+}
+
+/* 針對 ID 為 Show_RAG 的開關，在開啟狀態 (checked) 時更換背景色 */
+button#Show_RAG[data-state="checked"] {
+    background-color: rgb(82, 142, 194) !important; /* 這是標準的淺藍色 (Sky Blue) */
+    
+    /* 如果您想要更粉嫩一點的藍色，可以使用：#ADD8E6 */
+    /* 如果想要更亮一點的科技藍，可以使用：#60A5FA */
+}
+
+/* (選填) 如果您希望滑鼠懸停在開關上時，藍色能稍微深一點點，增加互動感 */
+button#Show_RAG[data-state="checked"]:hover {
+    background-color: #70C1E3 !important;
+}
+
+
+#readme-button:focus-visible {
+    /* 1. 修改 Tailwind 使用的 ring 變數 (最推薦的做法) */
+    --ring: #87CEEB !important;
+    
+    /* 2. 直接覆寫 box-shadow 以確保在所有瀏覽器完全生效 */
+    /* 這裡的 2px 是偏移量(offset)，4px 是外環寬度 */
+    box-shadow: 0 0 0 2px #1e1e1e, 0 0 0 4px #87CEEB !important;
+    
+    /* 3. 確保外框線不會出現預設的黑色邊框 */
+    outline: none !important;
+}
+
+
+/* 針對說明視窗右上角「關閉按鈕」的焦點環調整 */
+div[role="dialog"]:has(h2.text-3xl) button.absolute.right-4.top-4:focus-visible {
+    /* 1. 修改外框環顏色變數 */
+    --ring: #87CEEB !important; 
+    
+    /* 2. 直接設定外框環效果，確保覆寫預設的粉紅色 */
+    box-shadow: 0 0 0 2px #1e1e1e, 0 0 0 4px #87CEEB !important;
+    
+    /* 3. 移除預設的黑色邊框線 */
+    outline: none !important;
+}
+
+/* (選填) 讓滑鼠懸停在 X 上時，顏色稍微亮一點，增加操作回饋感 */
+div[role="dialog"]:has(h2.text-3xl) button.absolute.right-4.top-4:hover {
+    color: #87CEEB !important;
+    opacity: 1 !important;
+}
+
+
+/* 針對 ID 為 theme-toggle 的主題切換按鈕，修改選取時的外框環顏色 */
+#theme-toggle:focus-visible {
+    /* 1. 修改 Tailwind 的 ring 顏色變數為淺藍色 */
+    --ring: #87CEEB !important; 
+    
+    /* 2. 直接設定外框環效果，確保視覺一致性 */
+    /* 這裡的 2px 是偏移量，4px 是外環寬度 */
+    box-shadow: 0 0 0 2px #1e1e1e, 0 0 0 4px #87CEEB !important;
+    
+    /* 3. 移除瀏覽器預設的黑色外框 */
+    outline: none !important;
+}
+
+/* (選填) 如果希望滑鼠移上去時，圖示顏色也能帶一點點淺藍色的感覺 */
+#theme-toggle:hover {
+    color: #87CEEB !important;
 }
