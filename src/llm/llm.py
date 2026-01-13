@@ -14,7 +14,7 @@ from langchain_postgres.vectorstores import PGVector
 from openai import APIConnectionError, OpenAI
 
 from src.config.constant import (EMBEDDING_MODEL, OLLAMA_LOCAL, OLLAMA_URL,
-                                 PG_COLLECTION, PROJECT_ROOT, SYSTEM_PROMPT)
+                                 PG_COLLECTION, PROJECT_ROOT, SYSTEM_PROMPT, LM_STUDIO_IP)
 from src.database import postgreSQL_conn as pgc
 from src.rag.tools import create_few_game_rag_tool
 
@@ -55,6 +55,39 @@ class LmStudioEmbeddings(Embeddings):
             input=texts, model=self.model_name)
         return [x.embedding for x in response.data]
         # return [self.model.encode(t).tolist() for t in texts]
+
+
+"""
+選擇主要LLM
+"""
+
+
+def get_llm(model_option: str):
+    """根據前端選擇回傳對應的 LLM 實例"""
+    if "local/Gemma 3 12B" in model_option:
+        return ChatOpenAI(
+            model='gemma-3-12b-it',
+            openai_api_key="not-needed",
+            openai_api_base=LM_STUDIO_IP
+        )
+    elif "free/Gemini 3 flash" in model_option:
+        return ChatGoogleGenerativeAI(
+            model='gemini-3-flash-preview',
+            google_api_key=os.getenv("GOOGLE_API")
+        )
+    elif "price/Gemini 3 flash" in model_option:
+        return ChatGoogleGenerativeAI(
+            model='gemini-3-flash-preview',
+            google_api_key=os.getenv("GOOGLE_API_PRICE")
+        )
+    return None
+
+
+def init_bot(model_option: str):
+    llm = get_llm(model_option)
+    few_game_rag = create_few_game_rag_tool(vector_store)
+    tools = [few_game_rag]
+    return stream_chat_bot(llm, tools)
 
 
 """
@@ -222,44 +255,3 @@ class stream_chat_bot:
                 print(chunk, end='')
         # 回傳最終組合的對話內容
         return msg
-
-
-"""
-選擇主要LLM
-"""
-
-
-def get_llm(model_option: str):
-    """根據前端選擇回傳對應的 LLM 實例"""
-    if "local/Gemma 3 12B" in model_option:
-        return ChatOpenAI(
-            model='gemma-3-12b-it',
-            openai_api_key="not-needed",
-            openai_api_base='http://192.168.0.109:1234/v1'
-        )
-    elif "free/Gemini 3 flash" in model_option:
-        return ChatGoogleGenerativeAI(
-            model='gemini-3-flash-preview',
-            google_api_key=os.getenv("GOOGLE_API")
-        )
-    elif "price/Gemini 3 flash" in model_option:
-        return ChatGoogleGenerativeAI(
-            model='gemini-3-flash-preview',
-            google_api_key=os.getenv("GOOGLE_API_PRICE")
-        )
-    return None
-
-
-def init_bot(model_option: str):
-    llm = get_llm(model_option)
-    few_game_rag = create_few_game_rag_tool(vector_store)
-    tools = [few_game_rag]
-    return stream_chat_bot(llm, tools)
-
-
-few_game_rag = create_few_game_rag_tool(vector_store)
-tools = [few_game_rag]
-# bot = stream_chat_bot(llm, tools)
-
-# for x in bot.chat_generator("半條命2的評價如何", display_data=False):
-#     print(x, end='')

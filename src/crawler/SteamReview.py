@@ -12,10 +12,8 @@ logging.basicConfig(
 
 def run_steam_review():
     logging.info("收到指令，開始執行 Steam review 爬蟲...")
-    # if __name__ == "__main__":
-    review_scraper = SteamScraperBase(
-        scraper_type="game_review", url_type=GAME_REVIEW_URL)
-    # review_scraper.id_file_num = 2
-    # review_scraper.output_file_num = 3
-    review_scraper.run()
-    logging.info("Steam review 爬蟲執行完畢！")
+    if __name__ == "__main__":
+        review_scraper = SteamScraperBase(
+            scraper_type="game_review", url_type=GAME_REVIEW_URL)
+        review_scraper.run()
+        logging.info("Steam review 爬蟲執行完畢！")

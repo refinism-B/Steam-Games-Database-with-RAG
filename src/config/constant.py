@@ -17,10 +17,11 @@ GAME_REVIEW_URL = "https://store.steampowered.com/appreviews/{}?json=1&language=
 # 爬取game tag的API端點
 GAME_TAG_URL = "https://steamspy.com/api.php?request=appdetails&appid={}"
 
-# raw資料存放路徑
+# raw game id資料存放路徑
 RAW_GAME_ID_SUBFOLDER = "data/raw/game_id"
 RAW_ID_METADATA_SUBFOLDER = "data/raw/game_id/metadata"
 
+# raw資料存放路徑
 RAW_DATA_PATH = "data/raw/{}"
 RAW_METADATA_PATH = "data/raw/{}/metadata"
 
@@ -51,10 +52,11 @@ METADATA_COLS = ['type', 'name', 'steam_appid', 'required_age', 'is_free', 'supp
 CONTEXT_COLS = ['name', 'detailed_description', 'about_the_game',
                 'short_description', 'developers', 'publishers', 'categories', 'genres', 'tags']
 
-
+# 本地Chroma向量資料庫
 CHROMA_COLLECTION_NAME = "steam_games_DB"
 CHROMA_PERSIST_DIR = PROJECT_ROOT / "data/vector"
 
+# LLM系統提示詞
 SYSTEM_PROMPT = """
 ### **角色定位**
 
@@ -92,3 +94,4 @@ OLLAMA_LOCAL = os.environ.get("OLLAMA_LOCAL")
 OLLAMA_URL = os.environ.get("OLLAMA_URL")
 PG_COLLECTION = os.environ.get("PG_COLLECTION")
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL")
+LM_STUDIO_IP = os.environ.get("LM_STUDIO_IP")
