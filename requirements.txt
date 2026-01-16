@@ -29,3 +29,4 @@ langchain-postgres==0.0.16
 
 # --- 監控與追蹤 (OpenTelemetry) ---
 traceloop-sdk==0.50.1
+flask
