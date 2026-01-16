@@ -200,7 +200,8 @@ class SteamScraperBase:
 
                     if self.data_count % self.max_data_per_save == 0:
                         self._save_batch_data()
-
+                        logger.info(
+                            f"儲存第 {self.output_file_num} 號檔完畢, 目前資料筆: {len(self.current_data_list)}")
                     if len(self.current_data_list) >= self.max_results_per_file:
                         logger.info(
                             f"單檔達到 {self.max_results_per_file} 筆上限，切換至新檔案。")

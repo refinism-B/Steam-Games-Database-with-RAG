@@ -10,11 +10,12 @@ logging.basicConfig(
 )
 
 
-logging.info("收到指令，開始執行 Steam info 爬蟲...")
-if __name__ == "__main__":
+def run_steam_info():
+    logging.info("收到指令，開始執行 Steam info 爬蟲...")
+    # if __name__ == "__main__":
     info_scraper = SteamScraperBase(
-        scraper_type="game_info", url_type=GAME_INFO_URL, max_input_files=2)
-    info_scraper.id_file_num = 33
-    info_scraper.output_file_num = 65
+        scraper_type="game_info", url_type=GAME_INFO_URL)
+    # info_scraper.id_file_num = 2
+    # info_scraper.output_file_num = 3
     info_scraper.run()
     logging.info("Steam Info 爬蟲執行完畢！")
