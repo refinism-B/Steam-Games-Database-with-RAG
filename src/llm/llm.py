@@ -2,7 +2,7 @@ import os
 
 import psycopg2
 from langchain.embeddings.base import Embeddings
-from langchain.messages import (AIMessageChunk, HumanMessage, SystemMessage,
+from langchain.messages import (AIMessage, AIMessageChunk, HumanMessage, SystemMessage,
                                 ToolMessage)
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -114,6 +114,28 @@ class stream_chat_bot:
         # 將 LLM 的回應解析為純文字格式的工具
         self.str_parser = StrOutputParser()
 
+    def _get_clean_history_for_auxiliary_llm(self, messages):
+        """
+        為輔助 LLM 函式建立乾淨的對話歷史，
+        移除 tool_calls 相關內容以避免違反 Gemini API 順序規則。
+        
+        Gemini API 要求：Tool Call 必須緊接在 User 訊息或 Function Response 之後。
+        因此輔助函式（如 rephrase、summarize）不應傳入包含 tool_calls 的對話歷史。
+        """
+        clean_messages = []
+        for msg in messages:
+            if isinstance(msg, (AIMessage, AIMessageChunk)):
+                # 只保留純文字內容，移除 tool_calls
+                if msg.content:
+                    clean_messages.append(AIMessage(content=msg.content))
+            elif isinstance(msg, ToolMessage):
+                # 跳過 ToolMessage，因為輔助函式不需要工具執行結果
+                continue
+            else:
+                # HumanMessage, SystemMessage 直接保留
+                clean_messages.append(msg)
+        return clean_messages
+
     def _rephrase_query(self, user_input):
         """
         中間層 LLM：將使用者原始輸入轉換為更精準的查詢語句。
@@ -135,8 +157,9 @@ class stream_chat_bot:
         # 使用原始 LLM 進行快速轉換
         rephrase_chain = rephrase_prompt | self.llm | self.str_parser
 
-        # 取最近的 3 條紀錄作為參考，避免太長
-        history_context = self.message[-3:] if len(self.message) > 1 else []
+        # 取最近的 3 條紀錄作為參考，並清理 tool_calls 相關內容
+        raw_history = self.message[-3:] if len(self.message) > 1 else []
+        history_context = self._get_clean_history_for_auxiliary_llm(raw_history)
 
         refined_query = rephrase_chain.invoke({
             "history": history_context,
@@ -149,6 +172,9 @@ class stream_chat_bot:
         執行摘要邏輯：保留 System Prompt 與最新的 2 條訊息，
         將其餘的歷史紀錄壓縮成一段摘要。
         """
+        if not hasattr(self, 'system_prompt_content'):
+            self.system_prompt_content = SYSTEM_PROMPT
+
         if len(self.message) <= 3:
             return
 
@@ -156,18 +182,24 @@ class stream_chat_bot:
         to_summarize = self.message[1:-keep_latest]
         recent_messages = self.message[-keep_latest:]
 
+        # 清理要摘要的訊息，移除 tool_calls 相關內容
+        clean_to_summarize = self._get_clean_history_for_auxiliary_llm(to_summarize)
+
         summary_prompt = ChatPromptTemplate.from_messages([
             ("system", "你是一個專業的對話秘書。請將下方的對話紀錄精簡壓縮，保留核心重點，減少約 30% 總長度，並以繁體中文撰寫。"),
             ("placeholder", "{content}")
         ])
 
         summary_chain = summary_prompt | self.llm | self.str_parser
-        summary_text = summary_chain.invoke({"content": to_summarize})
+        summary_text = summary_chain.invoke({"content": clean_to_summarize})
+
+        # 重建訊息列表時，也清理最近的訊息
+        clean_recent_messages = self._get_clean_history_for_auxiliary_llm(recent_messages)
 
         self.message = [
             SystemMessage(content=self.system_prompt_content),
             HumanMessage(content=f"這是先前的對話摘要：{summary_text}"),
-            *recent_messages
+            *clean_recent_messages
         ]
         print(f"\n✨ [系統通知]: 歷史紀錄已精簡完成。")
 
@@ -177,8 +209,8 @@ class stream_chat_bot:
         逐步執行 LLM 回應與工具調用，並即時回傳每一步的結果。
         """
         try:
-            # 若對話紀錄超過三項，進行摘要
-            if len(self.message) > 3:
+            # 若對話紀錄超過 3 輪（約 8 則訊息），進行摘要
+            if len(self.message) > 8:
                 self._summarize_history()
 
             # 進行問題轉譯
