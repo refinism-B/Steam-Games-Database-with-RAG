@@ -107,9 +107,9 @@ class stream_chat_bot:
         self.llm_with_tools = llm.bind_tools(tools)
 
         # 系統提示詞（System Prompt），用來設定 LLM 的角色與行為
-        system_prompt = SYSTEM_PROMPT
+        self.system_prompt_content = SYSTEM_PROMPT
         # 初始化訊息列表，第一條訊息是系統指令
-        self.message = [SystemMessage(system_prompt)]
+        self.message = [SystemMessage(self.system_prompt_content)]
 
         # 將 LLM 的回應解析為純文字格式的工具
         self.str_parser = StrOutputParser()
