@@ -220,3 +220,4 @@ pyproject.toml
 /data/vector
 /docs/prompt.md
 __init__.py
+/.vscode

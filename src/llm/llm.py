@@ -12,15 +12,16 @@ from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
 # from langchain_ollama import OllamaEmbeddings
 from langchain_openai import ChatOpenAI
-from langchain_postgres.vectorstores import PGVector
+from langchain_postgres.vectorstores import DistanceStrategy, PGVector
 from openai import APIConnectionError, OpenAI
 
-from src.config.constant import (LM_STUDIO_IP, PG_COLLECTION,
-                                 SYSTEM_PROMPT, TEI_URL)
-# EMBEDDING_MODEL, OLLAMA_LOCAL, OLLAMA_URL, PROJECT_ROOT
-
+from src.config.constant import (LM_STUDIO_IP, PG_COLLECTION, SYSTEM_PROMPT,
+                                 TEI_URL)
 from src.database import postgreSQL_conn as pgc
 from src.rag.tools import create_few_game_rag_tool
+
+# EMBEDDING_MODEL, OLLAMA_LOCAL, OLLAMA_URL, PROJECT_ROOT
+
 
 """
 建立連線
@@ -42,6 +43,7 @@ vector_store = PGVector(
     collection_name=PG_COLLECTION,
     connection=pg_url,
     use_jsonb=True,
+    distance_strategy=DistanceStrategy.COSINE
 )
 
 
@@ -413,9 +415,24 @@ class stream_chat_bot:
                 print(f"🔄 [LLM 呼叫開始] 訊息數量: {len(self.message)}")
                 final_ai_message = AIMessageChunk(content="")
                 
+                # 用於緩衝內容，避免在工具呼叫時顯示「思考中」的文字
+                content_buffer = []
+                is_tool_turn = False
+                stream_started = False
+                BUFFER_THRESHOLD = 50  # 緩衝字元數閾值
+
                 # 使用 astream 非同步串流
                 async for chunk in self.llm_with_tools.astream(self.message):
                     final_ai_message += chunk
+                    
+                    # 檢查是否有工具呼叫
+                    if chunk.tool_call_chunks or chunk.tool_calls:
+                        is_tool_turn = True
+                        # 若確定是工具呼叫，且尚未開始串流顯示，則清空緩衝區（隱藏思考文字）
+                        if not stream_started:
+                            content_buffer = []
+                    
+                    # 處理內容
                     if hasattr(chunk, 'content') and chunk.content:
                         content = chunk.content
                         if isinstance(content, list):
@@ -424,8 +441,36 @@ class stream_chat_bot:
                                 if isinstance(part, dict) and 'text' in part
                             ]
                             content = ''.join(text_parts)
+                        
                         if content:
-                            yield content
+                            if is_tool_turn:
+                                # 若已知是工具呼叫回合，且之前沒開始輸出，則忽略內容
+                                if not stream_started:
+                                    continue
+                                else:
+                                    # 若已經開始輸出（極少見情況），只好繼續輸出
+                                    yield content
+                            else:
+                                # 尚未確認是否為工具回合
+                                if stream_started:
+                                    # 已經認定是回答，直接輸出
+                                    yield content
+                                else:
+                                    # 加入緩衝區
+                                    content_buffer.append(content)
+                                    current_buffer_len = sum(len(c) for c in content_buffer)
+                                    
+                                    # 若緩衝區超過閾值，認定為正式回答，開始輸出
+                                    if current_buffer_len > BUFFER_THRESHOLD:
+                                        stream_started = True
+                                        for c in content_buffer:
+                                            yield c
+                                        content_buffer = []
+
+                # 迴圈結束後，檢查是否還有緩衝內容
+                if not is_tool_turn and content_buffer:
+                    for c in content_buffer:
+                        yield c
 
                 print(f"✅ [LLM 回應完成] 內容長度: {len(final_ai_message.content)}, 工具呼叫數: {len(final_ai_message.tool_calls)}")
                 print(f"📝 [回應內容預覽]: {repr(final_ai_message.content[:200]) if final_ai_message.content else '(空)'}")

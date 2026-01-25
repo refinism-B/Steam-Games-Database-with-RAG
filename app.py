@@ -69,44 +69,104 @@ async def main(message: cl.Message):
         ).send()
         return
 
+    # 2. 初始化變數
     should_show_rag = settings["Show_RAG"]
-
-    # 2. 建立訊息物件，準備串流顯示
-    msg = cl.Message(content="", author="Steam RAG Bot")
-    await msg.send()
+    msg = None  # 延遲建立訊息物件
+    thinking_buffer = ""
+    BUFFER_THRESHOLD = 1500  # 思考緩衝區閾值
 
     # 3. 呼叫後端的非同步版本 async_chat_generator
     generator = bot.async_chat_generator(
         message.content, display_data=should_show_rag)
 
+    # 追蹤當前 Step 狀態（用於工具調用顯示）
+    current_step = None
+
     try:
         # 使用非同步迭代器接收串流
         async for chunk in generator:
-            print(f"🔹 [前端收到 chunk]: {repr(chunk[:100]) if len(chunk) > 100 else repr(chunk)}")
-            
-            # 跳過空字串
-            if not chunk or (isinstance(chunk, str) and not chunk.strip()):
-                continue
-                
-            # 跳過工具執行訊息（暫時不顯示）
-            if chunk.startswith("[執行]") or chunk.startswith("[結果]"):
+            if not chunk:
                 continue
 
-            # 使用 stream_token 即時逐字顯示
-            await msg.stream_token(chunk)
-            print(f"📨 [串流傳送]: {len(chunk)} 字元")
+            # 累積到緩衝區
+            thinking_buffer += chunk
+            
+            # --- 邏輯分支 1: 偵測到「執行工具」 ---
+            if "[執行]" in thinking_buffer:
+                if should_show_rag:
+                    # 分割思考過程與工具指令
+                    split_index = thinking_buffer.find("[執行]")
+                    thought_process = thinking_buffer[:split_index].strip()
+                    tool_content = thinking_buffer[split_index:].strip()
+                    
+                    # 處理工具資訊
+                    tool_info = tool_content.replace("[執行]: ", "").replace("\n-----------\n", "")
+                    
+                    # 建立 Step
+                    current_step = cl.Step(name="資料檢索...", type="tool")
+                    
+                    # 將思考過程與工具內容合併顯示
+                    display_input = tool_info
+                    if thought_process:
+                         display_input = f"🤔 思考過程：\n{thought_process}\n\n🛠️ 呼叫工具：\n{tool_info}"
+                    
+                    current_step.input = display_input
+                    await current_step.send()
+                    print(f"📋 [Step 建立]: {tool_info[:50]}...")
+
+                # 清空緩衝區（已轉為 Step 內容）
+                thinking_buffer = ""
+                continue
+
+            # --- 邏輯分支 2: 偵測到「執行結果」 ---
+            if "[結果]" in thinking_buffer:
+                if should_show_rag and current_step:
+                    # 處理結果資訊
+                    split_index = thinking_buffer.find("[結果]")
+                    result_content = thinking_buffer[split_index:].replace("[結果]: ", "").replace("\n-----------\n", "")
+                    
+                    current_step.output = result_content
+                    await current_step.update()
+                    print(f"📋 [Step 更新]: 結果長度 {len(result_content)} 字元")
+                    current_step = None
+
+                # 清空緩衝區
+                thinking_buffer = ""
+                continue
+
+            # --- 邏輯分支 3: 超過緩衝閾值（視為一般回應） ---
+            if len(thinking_buffer) > BUFFER_THRESHOLD:
+                # 建立訊息（如果尚未建立）
+                if msg is None:
+                    print(f"⚠️ 觸發閾值建立訊息！緩衝區長度: {len(thinking_buffer)}")
+                    print(f"⚠️ 緩衝區內容預覽: {repr(thinking_buffer[:100])}")
+
+                    msg = cl.Message(content="", author="Steam RAG Bot")
+                    await msg.send()
+                
+                # 將緩衝區內容串流出去
+                await msg.stream_token(thinking_buffer)
+                thinking_buffer = ""
 
     except Exception as e:
         print(f"❌ [發生錯誤]: {e}")
+        if msg is None:
+             msg = cl.Message(content="", author="Steam RAG Bot")
+             await msg.send()
         await msg.stream_token(f"\n\n\n⚠️ **系統發生錯誤**：{str(e)}")
     
-    # 完成串流，更新最終訊息
-    await msg.update()
-    
-    if msg.content:
-        print(f"✅ [訊息已發送] 內容長度: {len(msg.content)}")
-    else:
-        # 若無內容，發送提示訊息
-        msg.content = "⚠️ 系統未能產生回應，請重新嘗試。"
+    # 4. 迴圈結束後的清理工作
+    # 若緩衝區仍有剩餘文字（例如簡短的最終回應），這時才顯示
+    if thinking_buffer:
+        if msg is None:
+            msg = cl.Message(content="", author="Steam RAG Bot")
+            await msg.send()
+        await msg.stream_token(thinking_buffer)
+
+    # 更新最終訊息狀態
+    if msg:
         await msg.update()
-        print("⚠️ [無內容可發送]")
+    else:
+        # 只有在完全沒有任何產出（也沒有 Step ？）時才視為無回應
+        # 但若有 run step，msg 可能為 None，這時不應報錯，因為主要互動在 Step 中
+        pass
