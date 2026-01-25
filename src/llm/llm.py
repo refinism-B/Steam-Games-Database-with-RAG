@@ -1,20 +1,23 @@
 import os
 
-import psycopg2
+# import psycopg2
 from langchain.embeddings.base import Embeddings
-from langchain.messages import (AIMessage, AIMessageChunk, HumanMessage, SystemMessage,
-                                ToolMessage)
+from langchain.messages import (AIMessage, AIMessageChunk, HumanMessage,
+                                SystemMessage, ToolMessage)
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
-from langchain_ollama import OllamaEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
+# from langchain_ollama import OllamaEmbeddings
 from langchain_openai import ChatOpenAI
 from langchain_postgres.vectorstores import PGVector
 from openai import APIConnectionError, OpenAI
 
-from src.config.constant import (EMBEDDING_MODEL, OLLAMA_LOCAL, OLLAMA_URL,
-                                 PG_COLLECTION, PROJECT_ROOT, SYSTEM_PROMPT, LM_STUDIO_IP)
+from src.config.constant import (LM_STUDIO_IP, PG_COLLECTION,
+                                 SYSTEM_PROMPT, TEI_URL)
+# EMBEDDING_MODEL, OLLAMA_LOCAL, OLLAMA_URL, PROJECT_ROOT
+
 from src.database import postgreSQL_conn as pgc
 from src.rag.tools import create_few_game_rag_tool
 
@@ -22,9 +25,13 @@ from src.rag.tools import create_few_game_rag_tool
 建立連線
 """
 # 建立embedding連線
-embeddings = OllamaEmbeddings(
-    model=EMBEDDING_MODEL,
-    base_url=OLLAMA_URL
+# embeddings = OllamaEmbeddings(
+#     model=EMBEDDING_MODEL,
+#     base_url=OLLAMA_URL
+# )
+
+embeddings = HuggingFaceEndpointEmbeddings(
+    model=TEI_URL,
 )
 
 # 載入向量資料庫
@@ -80,6 +87,11 @@ def get_llm(model_option: str):
             model='gemini-3-flash-preview',
             google_api_key=os.getenv("GOOGLE_API_PRICE")
         )
+    elif "price/ChatGPT 4o mini" in model_option:
+        return ChatOpenAI(
+            model='gpt-4o-mini',
+            openai_api_key=os.getenv("OPENAI_API")
+        )
     return None
 
 
@@ -102,7 +114,7 @@ class stream_chat_bot:
         self.tools = tools
         # 建立工具名稱對應表，用於後續動態呼叫
         self.tool_map = {tool.name: tool for tool in tools}
-        
+
         # 將 LLM 綁定（bind）工具，使其具備自動呼叫工具的能力
         self.llm_with_tools = llm.bind_tools(tools)
 
@@ -118,7 +130,7 @@ class stream_chat_bot:
         """
         為輔助 LLM 函式建立乾淨的對話歷史，
         移除 tool_calls 相關內容以避免違反 Gemini API 順序規則。
-        
+
         Gemini API 要求：Tool Call 必須緊接在 User 訊息或 Function Response 之後。
         因此輔助函式（如 rephrase、summarize）不應傳入包含 tool_calls 的對話歷史。
         """
@@ -159,7 +171,8 @@ class stream_chat_bot:
 
         # 取最近的 3 條紀錄作為參考，並清理 tool_calls 相關內容
         raw_history = self.message[-3:] if len(self.message) > 1 else []
-        history_context = self._get_clean_history_for_auxiliary_llm(raw_history)
+        history_context = self._get_clean_history_for_auxiliary_llm(
+            raw_history)
 
         refined_query = rephrase_chain.invoke({
             "history": history_context,
@@ -183,7 +196,8 @@ class stream_chat_bot:
         recent_messages = self.message[-keep_latest:]
 
         # 清理要摘要的訊息，移除 tool_calls 相關內容
-        clean_to_summarize = self._get_clean_history_for_auxiliary_llm(to_summarize)
+        clean_to_summarize = self._get_clean_history_for_auxiliary_llm(
+            to_summarize)
 
         summary_prompt = ChatPromptTemplate.from_messages([
             ("system", "你是一個專業的對話秘書。請將下方的對話紀錄精簡壓縮，保留核心重點，減少約 30% 總長度，並以繁體中文撰寫。"),
@@ -194,7 +208,8 @@ class stream_chat_bot:
         summary_text = summary_chain.invoke({"content": clean_to_summarize})
 
         # 重建訊息列表時，也清理最近的訊息
-        clean_recent_messages = self._get_clean_history_for_auxiliary_llm(recent_messages)
+        clean_recent_messages = self._get_clean_history_for_auxiliary_llm(
+            recent_messages)
 
         self.message = [
             SystemMessage(content=self.system_prompt_content),
@@ -245,9 +260,10 @@ class stream_chat_bot:
 
                     # 實際執行工具（根據工具名稱動態呼叫對應物件）
                     if tool_call['name'] in self.tool_map:
-                         tool_result = self.tool_map[tool_call['name']].invoke(tool_call['args'])
+                        tool_result = self.tool_map[tool_call['name']].invoke(
+                            tool_call['args'])
                     else:
-                         tool_result = f"Error: Tool '{tool_call['name']}' not found."
+                        tool_result = f"Error: Tool '{tool_call['name']}' not found."
 
                     if display_data:
                         # # 顯示工具執行結果

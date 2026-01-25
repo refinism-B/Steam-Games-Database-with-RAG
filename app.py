@@ -14,8 +14,8 @@ async def start():
         Select(
             id="Model",
             label="選擇使用模型",
-            values=["free/Gemini 3 flash",
-                    "local/Gemma 3 12B", "price/Gemini 3 flash"],
+            values=["free/Gemini 3 flash", "price/Gemini 3 flash",
+                    "price/ChatGPT 4o mini", "local/Gemma 3 12B"],
             initial_index=0,
         ),
         Switch(

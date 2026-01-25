@@ -15,6 +15,7 @@ google-genai==1.57.0
 langchain-openai==1.1.7
 langchain-ollama==1.0.1
 anthropic==0.75.0
+langchain-huggingface==1.2.0
 
 # --- 向量資料庫與資料檢索 ---
 chromadb==1.4.0
