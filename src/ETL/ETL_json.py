@@ -1,4 +1,5 @@
 import json
+import math
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -72,6 +73,35 @@ def flatten_hardware_requirement(data):
 
     data.update(new_requirement_dict)
     return data
+
+
+def clean_languages(languages_data):
+    main_part = languages_data.split("<br>")[0]
+    return main_part.strip()
+
+
+def final_clean_nan(data):
+    """
+    遞迴清理資料，將所有 NaN 替換為 None，確保符合 JSON 規範。
+    """
+    if isinstance(data, dict):
+        # 處理 Dictionary
+        return {k: final_clean_nan(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        # 處理 List
+        return [final_clean_nan(item) for item in data]
+    elif isinstance(data, float):
+        # 核心檢查：處理真正的 NaN (math.isnan 只接受 float)
+        if math.isnan(data) or math.isinf(data):
+            return None
+        return data
+    elif isinstance(data, str):
+        # 處理可能的字串型態 "nan" (雖然較少見，但預防萬一)
+        if data.lower() == "nan":
+            return None
+        return data
+    else:
+        return data
 
 
 """
@@ -150,6 +180,22 @@ while True:
             new_game_info.pop("appid", None)
 
             """
+            進行描述型欄位處理
+            """
+            new_game_info["supported_languages"] = clean_languages(
+                new_game_info.get("supported_languages", ""))
+
+            # 處理'detailed_description', 'about_the_game', 'short_description'
+            descriptive_col = ['detailed_description', 'about_the_game',
+                               'short_description', 'supported_languages']
+            new_game_info = batch_clean_html(
+                data=new_game_info, col_list=descriptive_col)
+
+            # 處理hardware_requirements
+            new_game_info = clean_hardware_requirement(data=new_game_info)
+            new_game_info = flatten_hardware_requirement(data=new_game_info)
+
+            """
             進行數值與類別型欄位處理
             """
             # 處理category
@@ -215,11 +261,18 @@ while True:
             new_game_info.pop('metacritic', None)
 
             # 處理language
-            new_languages = new_game_info["languages"]
-            new_languages = new_languages.split(", ")
-            new_languages = [item.strip()
-                             for item in new_languages if type(item) == str]
-            new_game_info["languages"] = new_languages
+            new_languages = new_game_info.get("supported_languages", [])
+            if type(new_languages) == str:
+                new_languages = new_languages.replace(
+                    "languages with full audio support", "")
+                new_languages = new_languages.split(", ")
+                new_languages = [item.strip()
+                                 for item in new_languages if type(item) == str]
+                new_game_info["languages"] = new_languages
+                new_game_info.pop("supported_languages", None)
+            else:
+                new_game_info["supported_languages"] = []
+                print(f"第{info_list.index(single_data)}筆資料無語言資訊")
 
             # 處理release_date (增加格式錯誤處理)
             release_info = new_game_info.get('release_date', {})
@@ -274,18 +327,8 @@ while True:
             # new_game_info["review"] = review_overview
             new_game_info.pop("query_summary", None)
 
-            """
-            進行描述型欄位處理
-            """
-            # 處理'detailed_description', 'about_the_game', 'short_description', 'supported_languages'
-            descriptive_col = ['detailed_description', 'about_the_game',
-                               'short_description', 'supported_languages']
-            new_game_info = batch_clean_html(
-                data=new_game_info, col_list=descriptive_col)
-
-            # 處理hardware_requirements
-            new_game_info = clean_hardware_requirement(data=new_game_info)
-            new_game_info = flatten_hardware_requirement(data=new_game_info)
+            """最後清理NaN"""
+            new_game_info = final_clean_nan(new_game_info)
 
             # 加入列表
             data_list.append(new_game_info)
@@ -293,7 +336,7 @@ while True:
         except Exception as e:
             # 捕捉單筆資料處理失敗，印出錯誤但不中斷整個迴圈
             print(
-                f"處理 AppID {key_list[0] if key_list else 'Unknown'} 時發生錯誤: {e}")
+                f"處理第 {info_list.index(single_data)} 筆資料時時發生錯誤: {e}")
             traceback.print_exc()  # 如果需要詳細錯誤訊息可以取消註解
             continue
 

@@ -39,9 +39,10 @@ def create_few_game_rag_tool(vector_store):
         if not target_ids:
             return []
 
-        # 批次查詢父文件
+        # 批次查詢父文件（使用原始查詢進行相似度搜尋）
+        # 注意：HuggingFaceEndpointEmbeddings 不接受空字串，必須傳入有效的查詢文字
         parent_documents = vector_store.similarity_search(
-            query="",
+            query=question,
             k=len(target_ids),
             filter={"doc_id": {"$in": target_ids}}  # 假設支援 $in 運算子
         )

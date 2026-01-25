@@ -6,15 +6,17 @@ from pathlib import Path
 import tiktoken
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
-from langchain_ollama import OllamaEmbeddings
+# from langchain_ollama import OllamaEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from langchain_postgres.vectorstores import PGVector
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
 from tqdm import tqdm
 
-from src.config.constant import (EMBEDDING_MODEL, OLLAMA_LOCAL, OLLAMA_URL,
-                                 PG_COLLECTION, PROJECT_ROOT)
+from src.config.constant import (PG_COLLECTION, PROJECT_ROOT, TEI_LOCAL)
+# EMBEDDING_MODEL, OLLAMA_LOCAL, OLLAMA_URL
+
 from src.database import postgreSQL_conn as pgc
 
 """
@@ -108,10 +110,14 @@ def parent_document_slicer(doc_list, parent_splitter, child_splitter):
 
 def main():
     print("正在連線 Embedding 模型...")
-    embeddings = OllamaEmbeddings(
-        model=EMBEDDING_MODEL,
-        base_url=OLLAMA_LOCAL,
-        client_kwargs={"timeout": 300}
+    # embeddings = OllamaEmbeddings(
+    #     model=EMBEDDING_MODEL,
+    #     base_url=OLLAMA_LOCAL,
+    #     client_kwargs={"timeout": 300}
+    # )
+
+    embeddings = HuggingFaceEndpointEmbeddings(
+        model=TEI_LOCAL
     )
 
     pg_url = pgc.connect_to_pgSQL()
@@ -166,7 +172,7 @@ def main():
             ids = [doc.metadata["doc_id"] for doc in total_docs]
 
             # 2. 輸入PostgreSQL資料庫
-            batch_size = 100
+            batch_size = 32
             for i in tqdm(range(0, len(total_docs), batch_size), desc=f"寫入進度 ({input_file})"):
                 batch_docs = total_docs[i: i + batch_size]
                 batch_ids = ids[i: i + batch_size]
