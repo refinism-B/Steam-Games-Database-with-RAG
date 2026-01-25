@@ -71,37 +71,42 @@ async def main(message: cl.Message):
 
     should_show_rag = settings["Show_RAG"]
 
-    # 2. 建立一個空的訊息容器用於串流輸出
+    # 2. 建立訊息物件，準備串流顯示
     msg = cl.Message(content="", author="Steam RAG Bot")
+    await msg.send()
 
-    # 3. 呼叫後端的 chat_generator
-    # 注意：display_data 對應 settings["Show_RAG"]
-    generator = bot.chat_generator(
+    # 3. 呼叫後端的非同步版本 async_chat_generator
+    generator = bot.async_chat_generator(
         message.content, display_data=should_show_rag)
 
-    current_step = None
-
     try:
-        for chunk in generator:
+        # 使用非同步迭代器接收串流
+        async for chunk in generator:
+            print(f"🔹 [前端收到 chunk]: {repr(chunk[:100]) if len(chunk) > 100 else repr(chunk)}")
+            
+            # 跳過空字串
+            if not chunk or (isinstance(chunk, str) and not chunk.strip()):
+                continue
+                
+            # 跳過工具執行訊息（暫時不顯示）
             if chunk.startswith("[執行]") or chunk.startswith("[結果]"):
-                if should_show_rag:
-                    if chunk.startswith("[執行]"):
-                        current_step = cl.Step(name="正在檢索資料...", type="tool")
-                        await current_step.__aenter__()
-                        # 使用程式碼塊，配合 CSS 即可自動換行
-                        await current_step.stream_token(f"```python\n{chunk.replace('[執行]: ', '')}\n```")
-                    else:
-                        await current_step.stream_token(f"\n**檢索結果：**\n```text\n{chunk.replace('[結果]: ', '')}\n```")
-                        await current_step.__aexit__(None, None, None)
                 continue
 
-            # 處理一般對話內容的串流
-            if not msg.content:
-                await msg.send()
+            # 使用 stream_token 即時逐字顯示
             await msg.stream_token(chunk)
-    except Exception as e:
-        if not msg.content:
-            await msg.send()
-        await msg.stream_token(f"\n\n\n⚠️ **系統發生錯誤**：{str(e)}")
+            print(f"📨 [串流傳送]: {len(chunk)} 字元")
 
+    except Exception as e:
+        print(f"❌ [發生錯誤]: {e}")
+        await msg.stream_token(f"\n\n\n⚠️ **系統發生錯誤**：{str(e)}")
+    
+    # 完成串流，更新最終訊息
     await msg.update()
+    
+    if msg.content:
+        print(f"✅ [訊息已發送] 內容長度: {len(msg.content)}")
+    else:
+        # 若無內容，發送提示訊息
+        msg.content = "⚠️ 系統未能產生回應，請重新嘗試。"
+        await msg.update()
+        print("⚠️ [無內容可發送]")

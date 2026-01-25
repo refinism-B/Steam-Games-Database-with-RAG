@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 # import psycopg2
@@ -178,6 +179,12 @@ class stream_chat_bot:
             "history": history_context,
             "input": user_input
         })
+
+        # 限制查詢長度，防止 HuggingFaceEndpointEmbeddings 返回 413 錯誤
+        max_query_length = 500
+        if len(refined_query) > max_query_length:
+            refined_query = refined_query[:max_query_length]
+
         return refined_query
 
     def _summarize_history(self):
@@ -236,11 +243,25 @@ class stream_chat_bot:
 
             while True:
                 # 呼叫 LLM，傳入完整訊息歷史
+                print(f"🔄 [LLM 呼叫開始] 訊息數量: {len(self.message)}")
                 final_ai_message = AIMessageChunk(content="")
                 for chunk in self.llm_with_tools.stream(self.message):
                     final_ai_message += chunk
                     if hasattr(chunk, 'content') and chunk.content:
-                        yield self.str_parser.invoke(chunk)
+                        # 處理 Gemini API 回傳 list 格式的 content
+                        content = chunk.content
+                        if isinstance(content, list):
+                            # 提取 list 中的 text 欄位
+                            text_parts = [
+                                part.get('text', '') for part in content 
+                                if isinstance(part, dict) and 'text' in part
+                            ]
+                            content = ''.join(text_parts)
+                        if content:
+                            yield content
+
+                print(f"✅ [LLM 回應完成] 內容長度: {len(final_ai_message.content)}, 工具呼叫數: {len(final_ai_message.tool_calls)}")
+                print(f"📝 [回應內容預覽]: {repr(final_ai_message.content[:200]) if final_ai_message.content else '(空)'}")
 
                 response = final_ai_message
 
@@ -271,14 +292,22 @@ class stream_chat_bot:
                         yield msg
 
                     # 將工具執行結果封裝成 ToolMessage 回傳給 LLM
+                    # 限制工具結果長度，防止超過 LLM token 限制
+                    tool_result_str = str(tool_result)
+                    max_tool_result_length = 8000
+                    if len(tool_result_str) > max_tool_result_length:
+                        tool_result_str = tool_result_str[:max_tool_result_length] + "\n...(結果已截斷)"
+                        print(f"⚠️ [工具結果過長，已截斷至 {max_tool_result_length} 字元]")
+
                     tool_message = ToolMessage(
-                        content=str(tool_result),          # 工具執行的文字結果
-                        name=tool_call["name"],            # 工具名稱
+                        content=tool_result_str,               # 工具執行的文字結果
+                        name=tool_call["name"],                # 工具名稱
                         # 工具呼叫 ID（讓 LLM 知道對應哪個呼叫）
                         tool_call_id=tool_call["id"],
                     )
                     # 將工具回傳結果加入訊息列表，提供 LLM 下一輪參考
                     self.message.append(tool_message)
+                    print(f"✅ [工具執行完成]: {tool_call['name']}, 結果長度: {len(tool_result_str)} 字元")
 
                 # 若這一輪沒有任何工具呼叫，表示 LLM 已經生成最終回覆
                 if not is_tools_call:
@@ -292,6 +321,167 @@ class stream_chat_bot:
             raise e
         except APIConnectionError:
             # 處理 Local LLM 連線失敗
+            yield "本地端伺服器無法連接，請更換其他模型"
+            return
+
+    async def _async_rephrase_query(self, user_input):
+        """
+        非同步版本：將使用者原始輸入轉換為更精準的查詢語句。
+        """
+        rephrase_prompt = ChatPromptTemplate.from_messages([
+            ("system", """你是一個提問優化專家。請分析使用者的輸入與對話歷史，
+            將其轉換為一個『獨立、完整、精準且簡潔』的問題，以便讓後續的搜尋系統能精確執行。
+
+            規則：
+            1. 保留所有關鍵資訊（如：遊戲名稱、日期、特定術語）。
+            2. 修復錯字或語意不明之處。
+            3. 如果使用者使用了代名詞（如：他、這件事），請根據歷史紀錄替換成具體內容。
+            4. 直接輸出優化後的提問文字，不要包含額外的解釋。"""),
+            ("placeholder", "{history}"),
+            ("human", "{input}")
+        ])
+
+        rephrase_chain = rephrase_prompt | self.llm | self.str_parser
+
+        raw_history = self.message[-3:] if len(self.message) > 1 else []
+        history_context = self._get_clean_history_for_auxiliary_llm(raw_history)
+
+        # 使用非同步呼叫
+        refined_query = await rephrase_chain.ainvoke({
+            "history": history_context,
+            "input": user_input
+        })
+
+        max_query_length = 500
+        if len(refined_query) > max_query_length:
+            refined_query = refined_query[:max_query_length]
+
+        return refined_query
+
+    async def _async_summarize_history(self):
+        """
+        非同步版本：執行摘要邏輯，保留 System Prompt 與最新的 2 條訊息。
+        """
+        if not hasattr(self, 'system_prompt_content'):
+            self.system_prompt_content = SYSTEM_PROMPT
+
+        if len(self.message) <= 3:
+            return
+
+        keep_latest = 2
+        to_summarize = self.message[1:-keep_latest]
+        recent_messages = self.message[-keep_latest:]
+
+        clean_to_summarize = self._get_clean_history_for_auxiliary_llm(to_summarize)
+
+        summary_prompt = ChatPromptTemplate.from_messages([
+            ("system", "你是一個專業的對話秘書。請將下方的對話紀錄精簡壓縮，保留核心重點，減少約 30% 總長度，並以繁體中文撰寫。"),
+            ("placeholder", "{content}")
+        ])
+
+        summary_chain = summary_prompt | self.llm | self.str_parser
+        # 使用非同步呼叫
+        summary_text = await summary_chain.ainvoke({"content": clean_to_summarize})
+
+        clean_recent_messages = self._get_clean_history_for_auxiliary_llm(recent_messages)
+
+        self.message = [
+            SystemMessage(content=self.system_prompt_content),
+            HumanMessage(content=f"這是先前的對話摘要：{summary_text}"),
+            *clean_recent_messages
+        ]
+        print(f"\n✨ [系統通知]: 歷史紀錄已精簡完成。")
+
+    async def async_chat_generator(self, text, display_data=False):
+        """
+        非同步版本的對話生成函式（Async Generator）。
+        避免阻塞 Event Loop，確保 WebSocket 心跳正常。
+        """
+        try:
+            # 若對話紀錄超過 3 輪（約 8 則訊息），進行摘要
+            if len(self.message) > 8:
+                await self._async_summarize_history()
+
+            # 進行問題轉譯（非同步）
+            refined_text = await self._async_rephrase_query(text)
+
+            # 將轉譯內容加入訊息列表
+            self.message.append(HumanMessage(refined_text))
+
+            while True:
+                # 呼叫 LLM，傳入完整訊息歷史（非同步串流）
+                print(f"🔄 [LLM 呼叫開始] 訊息數量: {len(self.message)}")
+                final_ai_message = AIMessageChunk(content="")
+                
+                # 使用 astream 非同步串流
+                async for chunk in self.llm_with_tools.astream(self.message):
+                    final_ai_message += chunk
+                    if hasattr(chunk, 'content') and chunk.content:
+                        content = chunk.content
+                        if isinstance(content, list):
+                            text_parts = [
+                                part.get('text', '') for part in content 
+                                if isinstance(part, dict) and 'text' in part
+                            ]
+                            content = ''.join(text_parts)
+                        if content:
+                            yield content
+
+                print(f"✅ [LLM 回應完成] 內容長度: {len(final_ai_message.content)}, 工具呼叫數: {len(final_ai_message.tool_calls)}")
+                print(f"📝 [回應內容預覽]: {repr(final_ai_message.content[:200]) if final_ai_message.content else '(空)'}")
+
+                response = final_ai_message
+                self.message.append(response)
+
+                # 檢查 LLM 是否要求呼叫工具
+                is_tools_call = False
+                for tool_call in response.tool_calls:
+                    is_tools_call = True
+
+                    if display_data:
+                        msg = f'[執行]: {tool_call["name"]}({tool_call["args"]})\n-----------\n'
+                        yield msg
+
+                    # 非同步執行工具
+                    if tool_call['name'] in self.tool_map:
+                        tool = self.tool_map[tool_call['name']]
+                        # 優先使用 ainvoke，若不支援則用 to_thread 包裝
+                        if hasattr(tool, 'ainvoke'):
+                            tool_result = await tool.ainvoke(tool_call['args'])
+                        else:
+                            tool_result = await asyncio.to_thread(
+                                tool.invoke, tool_call['args']
+                            )
+                    else:
+                        tool_result = f"Error: Tool '{tool_call['name']}' not found."
+
+                    if display_data:
+                        msg = f'[結果]: {tool_result}\n-----------\n'
+                        yield msg
+
+                    tool_result_str = str(tool_result)
+                    max_tool_result_length = 8000
+                    if len(tool_result_str) > max_tool_result_length:
+                        tool_result_str = tool_result_str[:max_tool_result_length] + "\n...(結果已截斷)"
+                        print(f"⚠️ [工具結果過長，已截斷至 {max_tool_result_length} 字元]")
+
+                    tool_message = ToolMessage(
+                        content=tool_result_str,
+                        name=tool_call["name"],
+                        tool_call_id=tool_call["id"],
+                    )
+                    self.message.append(tool_message)
+                    print(f"✅ [工具執行完成]: {tool_call['name']}, 結果長度: {len(tool_result_str)} 字元")
+
+                if not is_tools_call:
+                    break
+
+        except ChatGoogleGenerativeAIError as e:
+            if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e):
+                yield "API額度已耗盡，請更換其他模型"
+                return
+            raise e
+        except APIConnectionError:
             yield "本地端伺服器無法連接，請更換其他模型"
             return
 
