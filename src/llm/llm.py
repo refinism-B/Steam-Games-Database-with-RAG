@@ -93,7 +93,8 @@ def get_llm(model_option: str):
     elif "price/ChatGPT 4o mini" in model_option:
         return ChatOpenAI(
             model='gpt-4o-mini',
-            openai_api_key=os.getenv("OPENAI_API")
+            openai_api_key=os.getenv("OPENAI_API"),
+            temperature=0
         )
     return None
 
@@ -119,7 +120,7 @@ class stream_chat_bot:
         self.tool_map = {tool.name: tool for tool in tools}
 
         # 將 LLM 綁定（bind）工具，使其具備自動呼叫工具的能力
-        self.llm_with_tools = llm.bind_tools(tools)
+        self.llm_with_tools = llm.bind_tools(tools, tool_choice="auto")
 
         # 系統提示詞（System Prompt），用來設定 LLM 的角色與行為
         self.system_prompt_content = SYSTEM_PROMPT
@@ -233,8 +234,8 @@ class stream_chat_bot:
         逐步執行 LLM 回應與工具調用，並即時回傳每一步的結果。
         """
         try:
-            # 若對話紀錄超過 3 輪（約 8 則訊息），進行摘要
-            if len(self.message) > 8:
+            # 若對話紀錄超過 n 輪（約 15 則訊息），進行摘要
+            if len(self.message) > 15:
                 self._summarize_history()
 
             # 進行問題轉譯
@@ -255,15 +256,17 @@ class stream_chat_bot:
                         if isinstance(content, list):
                             # 提取 list 中的 text 欄位
                             text_parts = [
-                                part.get('text', '') for part in content 
+                                part.get('text', '') for part in content
                                 if isinstance(part, dict) and 'text' in part
                             ]
                             content = ''.join(text_parts)
                         if content:
                             yield content
 
-                print(f"✅ [LLM 回應完成] 內容長度: {len(final_ai_message.content)}, 工具呼叫數: {len(final_ai_message.tool_calls)}")
-                print(f"📝 [回應內容預覽]: {repr(final_ai_message.content[:200]) if final_ai_message.content else '(空)'}")
+                print(
+                    f"✅ [LLM 回應完成] 內容長度: {len(final_ai_message.content)}, 工具呼叫數: {len(final_ai_message.tool_calls)}")
+                print(
+                    f"📝 [回應內容預覽]: {repr(final_ai_message.content[:200]) if final_ai_message.content else '(空)'}")
 
                 response = final_ai_message
 
@@ -298,7 +301,8 @@ class stream_chat_bot:
                     tool_result_str = str(tool_result)
                     max_tool_result_length = 8000
                     if len(tool_result_str) > max_tool_result_length:
-                        tool_result_str = tool_result_str[:max_tool_result_length] + "\n...(結果已截斷)"
+                        tool_result_str = tool_result_str[:
+                                                          max_tool_result_length] + "\n...(結果已截斷)"
                         print(f"⚠️ [工具結果過長，已截斷至 {max_tool_result_length} 字元]")
 
                     tool_message = ToolMessage(
@@ -309,7 +313,8 @@ class stream_chat_bot:
                     )
                     # 將工具回傳結果加入訊息列表，提供 LLM 下一輪參考
                     self.message.append(tool_message)
-                    print(f"✅ [工具執行完成]: {tool_call['name']}, 結果長度: {len(tool_result_str)} 字元")
+                    print(
+                        f"✅ [工具執行完成]: {tool_call['name']}, 結果長度: {len(tool_result_str)} 字元")
 
                 # 若這一輪沒有任何工具呼叫，表示 LLM 已經生成最終回覆
                 if not is_tools_call:
@@ -338,7 +343,8 @@ class stream_chat_bot:
             1. 保留所有關鍵資訊（如：遊戲名稱、日期、特定術語）。
             2. 修復錯字或語意不明之處。
             3. 如果使用者使用了代名詞（如：他、這件事），請根據歷史紀錄替換成具體內容。
-            4. 直接輸出優化後的提問文字，不要包含額外的解釋。"""),
+            4. 保持提問的語氣，確保這是一個可以用來檢索資料庫的問題。
+            5. 直接輸出優化後的提問文字，不要包含額外的解釋。"""),
             ("placeholder", "{history}"),
             ("human", "{input}")
         ])
@@ -346,7 +352,8 @@ class stream_chat_bot:
         rephrase_chain = rephrase_prompt | self.llm | self.str_parser
 
         raw_history = self.message[-3:] if len(self.message) > 1 else []
-        history_context = self._get_clean_history_for_auxiliary_llm(raw_history)
+        history_context = self._get_clean_history_for_auxiliary_llm(
+            raw_history)
 
         # 使用非同步呼叫
         refined_query = await rephrase_chain.ainvoke({
@@ -374,7 +381,8 @@ class stream_chat_bot:
         to_summarize = self.message[1:-keep_latest]
         recent_messages = self.message[-keep_latest:]
 
-        clean_to_summarize = self._get_clean_history_for_auxiliary_llm(to_summarize)
+        clean_to_summarize = self._get_clean_history_for_auxiliary_llm(
+            to_summarize)
 
         summary_prompt = ChatPromptTemplate.from_messages([
             ("system", "你是一個專業的對話秘書。請將下方的對話紀錄精簡壓縮，保留核心重點，減少約 30% 總長度，並以繁體中文撰寫。"),
@@ -385,7 +393,8 @@ class stream_chat_bot:
         # 使用非同步呼叫
         summary_text = await summary_chain.ainvoke({"content": clean_to_summarize})
 
-        clean_recent_messages = self._get_clean_history_for_auxiliary_llm(recent_messages)
+        clean_recent_messages = self._get_clean_history_for_auxiliary_llm(
+            recent_messages)
 
         self.message = [
             SystemMessage(content=self.system_prompt_content),
@@ -400,8 +409,8 @@ class stream_chat_bot:
         避免阻塞 Event Loop，確保 WebSocket 心跳正常。
         """
         try:
-            # 若對話紀錄超過 3 輪（約 8 則訊息），進行摘要
-            if len(self.message) > 8:
+            # 若對話紀錄超過 n 輪（約 15 則訊息），進行摘要
+            if len(self.message) > 15:
                 await self._async_summarize_history()
 
             # 進行問題轉譯（非同步）
@@ -414,7 +423,7 @@ class stream_chat_bot:
                 # 呼叫 LLM，傳入完整訊息歷史（非同步串流）
                 print(f"🔄 [LLM 呼叫開始] 訊息數量: {len(self.message)}")
                 final_ai_message = AIMessageChunk(content="")
-                
+
                 # 用於緩衝內容，避免在工具呼叫時顯示「思考中」的文字
                 content_buffer = []
                 is_tool_turn = False
@@ -424,24 +433,24 @@ class stream_chat_bot:
                 # 使用 astream 非同步串流
                 async for chunk in self.llm_with_tools.astream(self.message):
                     final_ai_message += chunk
-                    
+
                     # 檢查是否有工具呼叫
                     if chunk.tool_call_chunks or chunk.tool_calls:
                         is_tool_turn = True
                         # 若確定是工具呼叫，且尚未開始串流顯示，則清空緩衝區（隱藏思考文字）
                         if not stream_started:
                             content_buffer = []
-                    
+
                     # 處理內容
                     if hasattr(chunk, 'content') and chunk.content:
                         content = chunk.content
                         if isinstance(content, list):
                             text_parts = [
-                                part.get('text', '') for part in content 
+                                part.get('text', '') for part in content
                                 if isinstance(part, dict) and 'text' in part
                             ]
                             content = ''.join(text_parts)
-                        
+
                         if content:
                             if is_tool_turn:
                                 # 若已知是工具呼叫回合，且之前沒開始輸出，則忽略內容
@@ -458,8 +467,9 @@ class stream_chat_bot:
                                 else:
                                     # 加入緩衝區
                                     content_buffer.append(content)
-                                    current_buffer_len = sum(len(c) for c in content_buffer)
-                                    
+                                    current_buffer_len = sum(
+                                        len(c) for c in content_buffer)
+
                                     # 若緩衝區超過閾值，認定為正式回答，開始輸出
                                     if current_buffer_len > BUFFER_THRESHOLD:
                                         stream_started = True
@@ -472,8 +482,10 @@ class stream_chat_bot:
                     for c in content_buffer:
                         yield c
 
-                print(f"✅ [LLM 回應完成] 內容長度: {len(final_ai_message.content)}, 工具呼叫數: {len(final_ai_message.tool_calls)}")
-                print(f"📝 [回應內容預覽]: {repr(final_ai_message.content[:200]) if final_ai_message.content else '(空)'}")
+                print(
+                    f"✅ [LLM 回應完成] 內容長度: {len(final_ai_message.content)}, 工具呼叫數: {len(final_ai_message.tool_calls)}")
+                print(
+                    f"📝 [回應內容預覽]: {repr(final_ai_message.content[:200]) if final_ai_message.content else '(空)'}")
 
                 response = final_ai_message
                 self.message.append(response)
@@ -507,7 +519,8 @@ class stream_chat_bot:
                     tool_result_str = str(tool_result)
                     max_tool_result_length = 8000
                     if len(tool_result_str) > max_tool_result_length:
-                        tool_result_str = tool_result_str[:max_tool_result_length] + "\n...(結果已截斷)"
+                        tool_result_str = tool_result_str[:
+                                                          max_tool_result_length] + "\n...(結果已截斷)"
                         print(f"⚠️ [工具結果過長，已截斷至 {max_tool_result_length} 字元]")
 
                     tool_message = ToolMessage(
@@ -516,7 +529,8 @@ class stream_chat_bot:
                         tool_call_id=tool_call["id"],
                     )
                     self.message.append(tool_message)
-                    print(f"✅ [工具執行完成]: {tool_call['name']}, 結果長度: {len(tool_result_str)} 字元")
+                    print(
+                        f"✅ [工具執行完成]: {tool_call['name']}, 結果長度: {len(tool_result_str)} 字元")
 
                 if not is_tools_call:
                     break

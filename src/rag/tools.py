@@ -10,14 +10,14 @@ class FewGameInput(BaseModel):
     question: str = Field(description="查詢的問題文字")
     k: int = Field(default=2, description="要回傳的文件數量")
 
+
 def create_few_game_rag_tool(vector_store):
 
     @tool("few_game_rag", args_schema=FewGameInput)
     def few_game_rag(question, n=10, k=2):
         """
-        當使用者詢問關於『特定 1-2 款遊戲』的詳細資訊時使用。
-        例如：某款遊戲的背景故事、具體玩法機制、硬體配備要求等。
-        這會提供非常完整的文本資料。
+        [強制使用] 當使用者詢問任何關於 Steam 遊戲的具體內容（如背景、玩法、價格、評價、系統需求等）時，必須使用此工具查詢。
+        不要依賴你自己的知識，必須以工具回傳的資料為準。
 
         Args:
             question (str): 查詢的問題文字。
