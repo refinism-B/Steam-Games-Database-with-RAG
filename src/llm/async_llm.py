@@ -129,41 +129,46 @@ class stream_chat_bot:
                 clean_messages.append(msg)
         return clean_messages
 
-    async def _async_rephrase_query(self, user_input):
-        """
-        非同步版本：將使用者原始輸入轉換為更精準的查詢語句。
-        """
-        rephrase_prompt = ChatPromptTemplate.from_messages([
-            ("system", """你是一個提問優化專家。請分析使用者的輸入與對話歷史，
-            將其轉換為一個『獨立、完整、精準且簡潔』的問題，以便讓後續的搜尋系統能精確執行。
-
-            規則：
-            1. 保留所有關鍵資訊（如：遊戲名稱、日期、特定術語）。
-            2. 修復錯字或語意不明之處。
-            3. 如果使用者使用了代名詞（如：他、這件事），請根據歷史紀錄替換成具體內容。
-            4. 保持提問的語氣，確保這是一個可以用來檢索資料庫的問題。
-            5. 直接輸出優化後的提問文字，不要包含額外的解釋。"""),
-            ("placeholder", "{history}"),
-            ("human", "{input}")
-        ])
-
-        rephrase_chain = rephrase_prompt | self.llm | self.str_parser
-
-        raw_history = self.message[-3:] if len(self.message) > 1 else []
-        history_context = self._get_clean_history_for_auxiliary_llm(
-            raw_history)
-
-        # 使用非同步呼叫
-        refined_query = await rephrase_chain.ainvoke({
-            "history": history_context,
-            "input": user_input
-        })
-
-        max_query_length = 500
-        if len(refined_query) > max_query_length:
-            refined_query = refined_query[:max_query_length]
-
-        return refined_query
+    # ==========================================================================
+    # [已暫停] 問題重述功能 (Rephrase)
+    # 若需恢復，請移除此區塊的多行註解標記
+    # ==========================================================================
+    # async def _async_rephrase_query(self, user_input):
+    #     """
+    #     非同步版本：將使用者原始輸入轉換為更精準的查詢語句。
+    #     """
+    #     rephrase_prompt = ChatPromptTemplate.from_messages([
+    #         ("system", """你是一個提問優化專家。請分析使用者的輸入與對話歷史，
+    #         將其轉換為一個『獨立、完整、精準且簡潔』的問題，以便讓後續的搜尋系統能精確執行。
+    #
+    #         規則：
+    #         1. 保留所有關鍵資訊（如：遊戲名稱、日期、特定術語）。
+    #         2. 修復錯字或語意不明之處。
+    #         3. 如果使用者使用了代名詞（如：他、這件事），請根據歷史紀錄替換成具體內容。
+    #         4. 保持提問的語氣，確保這是一個可以用來檢索資料庫的問題。
+    #         5. 直接輸出優化後的提問文字，不要包含額外的解釋。"""),
+    #         ("placeholder", "{history}"),
+    #         ("human", "{input}")
+    #     ])
+    #
+    #     rephrase_chain = rephrase_prompt | self.llm | self.str_parser
+    #
+    #     raw_history = self.message[-3:] if len(self.message) > 1 else []
+    #     history_context = self._get_clean_history_for_auxiliary_llm(
+    #         raw_history)
+    #
+    #     # 使用非同步呼叫
+    #     refined_query = await rephrase_chain.ainvoke({
+    #         "history": history_context,
+    #         "input": user_input
+    #     })
+    #
+    #     max_query_length = 500
+    #     if len(refined_query) > max_query_length:
+    #         refined_query = refined_query[:max_query_length]
+    #
+    #     return refined_query
+    # ==========================================================================
 
     async def _async_summarize_history(self):
         """
@@ -211,11 +216,11 @@ class stream_chat_bot:
             if len(self.message) > 15:
                 await self._async_summarize_history()
 
-            # 進行問題轉譯（非同步）
-            refined_text = await self._async_rephrase_query(text)
+            # [已暫停] 問題重述功能 - 直接使用原始輸入
+            # refined_text = await self._async_rephrase_query(text)
 
-            # 將轉譯內容加入訊息列表
-            self.message.append(HumanMessage(refined_text))
+            # 將使用者原始輸入加入訊息列表（暫停問題重述後的流程）
+            self.message.append(HumanMessage(text))
 
             while True:
                 # 呼叫 LLM，傳入完整訊息歷史（非同步串流）
