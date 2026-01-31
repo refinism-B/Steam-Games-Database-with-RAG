@@ -44,17 +44,40 @@ def create_few_game_rag_tool(vector_store):
         step1_end = time.time()
         print(f"⏱️ Step 1 (Embedding) 耗時: {step1_end - rag_start:.4f} 秒")
         
-        # 步驟 2：檢索子文件 (這步會吃到 HNSW 索引，約 0.2s)
-        child_docs = vector_store.similarity_search_by_vector(query_vector, k=n)
+        # 步驟 2：使用 Raw SQL 檢索子文件 (優化 HNSW 索引)
+        # [關鍵優化] 1. 只選取 metadata 減少資料傳輸量
+        #            2. 設定 ef_search=40 避免搜尋過深
+        target_ids = []
+        try:
+            # 格式化向量為 PostgreSQL 接受的字串格式
+            vector_str = f"[{','.join(map(str, query_vector))}]"
+            
+            with _engine.connect() as conn:
+                # [關鍵指令 1] 設定 HNSW ef_search 參數確保檢索速度
+                conn.execute(text("SET LOCAL hnsw.ef_search = 40;"))
+                
+                # [關鍵指令 2] 執行向量查詢 SQL，只選取 metadata
+                vector_sql = text("""
+                    SELECT metadata 
+                    FROM document_embeddings 
+                    ORDER BY embedding <=> :vector_str 
+                    LIMIT :n;
+                """)
+                result = conn.execute(vector_sql, {"vector_str": vector_str, "n": n})
+                rows = result.fetchall()
+            
+            # 從結果中提取 parent_id 並去重
+            unique_parent_ids = list(dict.fromkeys([
+                row[0].get("parent_id") for row in rows if row[0].get("parent_id") is not None
+            ]))
+            # [關鍵修正] 強制轉型為字串，確保與 PG 索引 (metadata->>'doc_id') 的型態一致
+            target_ids = [str(pid) for pid in unique_parent_ids[:k]]
+            
+        except Exception as e:
+            print(f"❌ Step 2 向量檢索失敗：{e}")
+        
         step2_end = time.time()
         print(f"⏱️ Step 2 (HNSW Search) 耗時: {step2_end - step1_end:.4f} 秒")
-
-        # 提取父文件 ID
-        unique_parent_ids = list(dict.fromkeys([
-            doc.metadata.get("parent_id") for doc in child_docs if doc.metadata.get("parent_id") is not None
-        ]))
-        # [關鍵修正] 強制轉型為字串，確保與 PG 索引 (metadata->>'doc_id') 的型態一致
-        target_ids = [str(pid) for pid in unique_parent_ids[:k]]
 
         if not target_ids:
             return []

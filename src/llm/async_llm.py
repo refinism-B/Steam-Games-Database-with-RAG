@@ -213,7 +213,7 @@ class stream_chat_bot:
         """
         try:
             # 若對話紀錄超過 n 輪（約 15 則訊息），進行摘要
-            if len(self.message) > 15:
+            if len(self.message) > 20:
                 await self._async_summarize_history()
 
             # [已暫停] 問題重述功能 - 直接使用原始輸入
