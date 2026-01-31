@@ -1,6 +1,6 @@
 import chainlit as cl
 from chainlit.input_widget import Select, Switch
-from src.llm.llm import init_bot
+from src.llm.async_llm import init_bot
 
 
 USER_AVATAR = "public/avatars/User.png"
@@ -15,7 +15,7 @@ async def start():
             id="Model",
             label="選擇使用模型",
             values=["free/Gemini 3 flash", "price/Gemini 3 flash",
-                    "price/ChatGPT 4o mini", "local/Gemma 3 12B"],
+                    "price/GPT 4o mini", "local/Gemma 3 12B"],
             initial_index=0,
         ),
         Switch(
@@ -90,7 +90,7 @@ async def main(message: cl.Message):
 
             # 累積到緩衝區
             thinking_buffer += chunk
-            
+
             # --- 邏輯分支 1: 偵測到「執行工具」 ---
             if "[執行]" in thinking_buffer:
                 if should_show_rag:
@@ -98,18 +98,19 @@ async def main(message: cl.Message):
                     split_index = thinking_buffer.find("[執行]")
                     thought_process = thinking_buffer[:split_index].strip()
                     tool_content = thinking_buffer[split_index:].strip()
-                    
+
                     # 處理工具資訊
-                    tool_info = tool_content.replace("[執行]: ", "").replace("\n-----------\n", "")
-                    
+                    tool_info = tool_content.replace(
+                        "[執行]: ", "").replace("\n-----------\n", "")
+
                     # 建立 Step
                     current_step = cl.Step(name="資料檢索...", type="tool")
-                    
+
                     # 將思考過程與工具內容合併顯示
                     display_input = tool_info
                     if thought_process:
-                         display_input = f"🤔 思考過程：\n{thought_process}\n\n🛠️ 呼叫工具：\n{tool_info}"
-                    
+                        display_input = f"🤔 思考過程：\n{thought_process}\n\n🛠️ 呼叫工具：\n{tool_info}"
+
                     current_step.input = display_input
                     await current_step.send()
                     print(f"📋 [Step 建立]: {tool_info[:50]}...")
@@ -123,9 +124,12 @@ async def main(message: cl.Message):
                 if should_show_rag and current_step:
                     # 處理結果資訊
                     split_index = thinking_buffer.find("[結果]")
-                    result_content = thinking_buffer[split_index:].replace("[結果]: ", "").replace("\n-----------\n", "")
-                    
-                    current_step.output = result_content
+                    result_content = thinking_buffer[split_index:].replace(
+                        "[結果]: ", "").replace("\n-----------\n", "")
+
+                    current_step.output = f"```data\n{result_content}\n```"
+
+                    # current_step.output = result_content
                     await current_step.update()
                     print(f"📋 [Step 更新]: 結果長度 {len(result_content)} 字元")
                     current_step = None
@@ -143,7 +147,7 @@ async def main(message: cl.Message):
 
                     msg = cl.Message(content="", author="Steam RAG Bot")
                     await msg.send()
-                
+
                 # 將緩衝區內容串流出去
                 await msg.stream_token(thinking_buffer)
                 thinking_buffer = ""
@@ -151,10 +155,10 @@ async def main(message: cl.Message):
     except Exception as e:
         print(f"❌ [發生錯誤]: {e}")
         if msg is None:
-             msg = cl.Message(content="", author="Steam RAG Bot")
-             await msg.send()
+            msg = cl.Message(content="", author="Steam RAG Bot")
+            await msg.send()
         await msg.stream_token(f"\n\n\n⚠️ **系統發生錯誤**：{str(e)}")
-    
+
     # 4. 迴圈結束後的清理工作
     # 若緩衝區仍有剩餘文字（例如簡短的最終回應），這時才顯示
     if thinking_buffer:
